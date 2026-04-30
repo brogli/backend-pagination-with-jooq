@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-pagination-pg
+spec:
+  containers:
+    - name: postgres
+      image: docker.io/library/postgres:16
+      env:
+        - name: POSTGRES_PASSWORD
+          value: postgres
+        - name: POSTGRES_DB
+          value: books
+      ports:
+        - containerPort: 5432
+          hostPort: 5432
