@@ -1,0 +1,36 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.6'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+	runtimeOnly 'org.postgresql:postgresql'
+}
+
+tasks.named('bootBuildImage') {
+	imageName = 'backend-pagination-with-jooq:local'
+	docker {
+		// Required when DOCKER_HOST points at a rootless podman socket: the
+		// buildpacks lifecycle creator container expects /var/run/docker.sock
+		// inside itself, so we bind the host socket through. No-op for vanilla
+		// dockerd where the socket already lives at that path.
+		bindHostToBuilder = true
+	}
+}
