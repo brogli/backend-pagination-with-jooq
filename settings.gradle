@@ -1,1 +1,3 @@
 rootProject.name = 'backend-pagination-with-jooq'
+
+include 'backend'

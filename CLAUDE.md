@@ -4,7 +4,7 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 
 ## Layout
 
-- Spring Boot app in `backend/`. Run gradle as `./gradlew` from there, never global.
+- Multi-module Gradle build at the repo root. Subprojects: `:backend` (Spring Boot) and `:frontend` (Vue 3 + pnpm). Run `./gradlew` from the repo root, never global.
 - `docs/` is the canonical evolving design.
 
 ## Pinned versions
@@ -34,7 +34,7 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 
 - `master.xml` order is schema → seed → indexes (indexes after the seed for fast bulk insert).
 - `seed-large` is opt-in: `application.yml` excludes it; `application-local.yml` includes it; codegen excludes via `new Contexts('!seed-large')`.
-- Seed dev DB with `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun`. Re-seed by tearing down the pod or truncating.
+- Seed dev DB with `SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun`. Re-seed by tearing down the pod or truncating.
 - In Gradle task actions use `Driver.connect(...)` directly — `DriverManager.getConnection` rejects buildscript-classloader drivers.
 - `bootBuildImage` and codegen testcontainers need `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock` (set in `~/.bashrc`; inline-export for non-interactive shells).
 
@@ -47,12 +47,11 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 ## Running
 
 ```bash
-cd backend
-./gradlew generateJooq                              # codegen via testcontainer
-./gradlew openApiGenerate                           # BooksApi + DTOs from openapi.yaml
-./gradlew bootRun                                   # dev, no seed
-SPRING_PROFILES_ACTIVE=local ./gradlew bootRun      # dev + 1M-row seed
-./gradlew bootBuildImage                            # OCI image
+./gradlew :backend:generateJooq                              # codegen via testcontainer
+./gradlew :backend:openApiGenerate                           # BooksApi + DTOs from openapi.yaml
+./gradlew :backend:bootRun                                   # dev, no seed
+SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun      # dev + 1M-row seed
+./gradlew :backend:bootBuildImage                            # OCI image
 ```
 
 DataSource: `jdbc:postgresql://localhost:5432/books`, `postgres`/`postgres`. Override via `SPRING_DATASOURCE_*`.
