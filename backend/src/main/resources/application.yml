@@ -7,6 +7,8 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
   liquibase:
     change-log: classpath:db/changelog/master.xml
+    # Skip the seed-large changeset; opt-in via Liquibase CLI for dev seeding.
+    contexts: '!seed-large'
 
 management:
   endpoints:

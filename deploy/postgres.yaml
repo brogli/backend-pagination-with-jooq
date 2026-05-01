@@ -7,6 +7,8 @@ spec:
     - name: postgres
       image: docker.io/library/postgres:16
       env:
+        - name: POSTGRES_USER
+          value: postgres
         - name: POSTGRES_PASSWORD
           value: postgres
         - name: POSTGRES_DB
