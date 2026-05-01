@@ -21,13 +21,13 @@ Postgres 16 listens on `localhost:5432`, db `books`, user/pass `postgres`/`postg
 
 ```bash
 cd backend
-./gradlew bootRun
+./gradlew bootRun                                  # no test data
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # seed 1M rows on first startup
 ```
 
 Then `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.
 
-
-Liquibase runs at startup against the `db/changelog/master.xml` changelog.
+Liquibase runs at startup against `db/changelog/master.xml`.
 
 ## Build and run as a container
 

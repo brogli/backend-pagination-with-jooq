@@ -4,4 +4,9 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <include file="db/changelog/001-schema.sql"/>
+    <include file="db/changelog/002-seed-large.sql"/>
+    <include file="db/changelog/003-indexes.sql"/>
+
 </databaseChangeLog>

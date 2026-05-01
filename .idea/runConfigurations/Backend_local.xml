@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Backend local" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ACTIVE_PROFILES" value="local" />
+    <option name="ENABLE_JMX_AUTH" value="true" />
+    <module name="com.example.backend-pagination-with-jooq.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.bookpagination.BookPaginationApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

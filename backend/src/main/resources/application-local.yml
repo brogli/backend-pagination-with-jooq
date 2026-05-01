@@ -1,0 +1,4 @@
+spring:
+  liquibase:
+    # Override the base profile's '!seed-large' so the 1M-row dev seed runs.
+    contexts: 'seed-large'
