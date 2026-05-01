@@ -1,0 +1,211 @@
+openapi: 3.1.1
+info:
+  title: Book Pagination API
+  version: 1.0.0
+  summary: Keyset-paginated book browser with single-column sort and toolbar filters.
+  description: |
+    Single-column sort (server-side) with id tiebreaker. Bidirectional
+    pagination via a cursor passed as plain query params: `cursorValue`
+    (the sort column value of the anchor row) and `cursorId` (the anchor
+    row's id). Each response body carries `next` and `prev` cursors that
+    the client passes verbatim as `cursorValue`/`cursorId` on the next
+    request.
+
+paths:
+  /api/books:
+    get:
+      tags: [books]
+      operationId: searchBooks
+      summary: Page through books with single-column sort and toolbar filters.
+      parameters:
+        - name: sort
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/SortField'
+        - name: dir
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/Direction'
+        - name: size
+          in: query
+          required: false
+          description: Page size. Server caps at 100; defaults to 25 when omitted.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursorValue
+          in: query
+          required: false
+          description: |
+            Sort column value of the cursor anchor row. The server parses
+            it according to the request's `sort` field — a date string for
+            `publishedAt`, a number for `price`/`rating`, etc. Must be
+            provided together with `cursorId` (and vice versa); either both
+            present (paging from a known anchor) or both absent (first page).
+          schema:
+            type: string
+        - name: cursorId
+          in: query
+          required: false
+          description: Id of the cursor anchor row. Tiebreaker for the sort.
+          schema:
+            type: integer
+            format: int64
+        - name: filters
+          in: query
+          required: false
+          style: form
+          explode: true
+          description: |
+            All toolbar filters bundled into one object. Wire format is
+            the usual flat query string (`?language=English&inStock=true`)
+            because `explode: true` means each property becomes its own
+            query param. The `genre` array is repeated-keys
+            (`?genre=Fantasy&genre=SciFi`) — standard form-explode
+            encoding for arrays inside an exploded object.
+          schema:
+            $ref: '#/components/schemas/BookFilters'
+      responses:
+        '200':
+          description: A page of books.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookPage'
+        '400':
+          description: Bad request (invalid params, malformed seek key).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  schemas:
+    SortField:
+      type: string
+      enum: [title, author, price, rating, publishedAt]
+
+    Direction:
+      type: string
+      enum: [asc, desc]
+
+    Genre:
+      type: string
+      enum: [Fantasy, SciFi, Mystery, Romance, Thriller, NonFiction]
+
+    Language:
+      type: string
+      enum: [English, German, French, Spanish, Japanese]
+
+    BookFilters:
+      type: object
+      description: |
+        Bundled toolbar filters carried as exploded query params. Match
+        mode is `in` for `genre` (multi-select), `equals` for scalars,
+        `gte`/`lte` for the range fields.
+      properties:
+        genre:
+          type: array
+          items:
+            $ref: '#/components/schemas/Genre'
+        language:
+          $ref: '#/components/schemas/Language'
+        inStock:
+          type: boolean
+        minRating:
+          type: number
+          minimum: 0
+          maximum: 5
+        priceMin:
+          type: number
+          minimum: 0
+        priceMax:
+          type: number
+          minimum: 0
+        publishedAfter:
+          type: string
+          format: date
+
+    BookDto:
+      type: object
+      required: [id, title, author, genre, language, inStock, rating, price, publishedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        author:
+          type: string
+        genre:
+          $ref: '#/components/schemas/Genre'
+        language:
+          $ref: '#/components/schemas/Language'
+        inStock:
+          type: boolean
+        rating:
+          type: number
+        price:
+          type: number
+        publishedAt:
+          type: string
+          format: date
+
+    SeekKey:
+      type: object
+      description: |
+        Cursor anchor. Pass back as `?cursorValue=<value>&cursorId=<id>`
+        to fetch the page anchored on this row. The same shape is used
+        for both `next` and `prev`: the server gives the cursor that
+        lands the user on the requested page, the client sends it back
+        as `cursorValue`/`cursorId` exactly the same way.
+      required: [value, id]
+      properties:
+        value:
+          description: |
+            Sort column value of the anchor row. Heterogeneous —
+            string | number | ISO-8601 date — matching the request's
+            `sort` field. The server type-coerces from the URL string
+            on the way in.
+        id:
+          type: integer
+          format: int64
+
+    BookPage:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookDto'
+        next:
+          oneOf:
+            - $ref: '#/components/schemas/SeekKey'
+            - type: 'null'
+          description: Seek key for the next page. Null on the last page.
+        prev:
+          oneOf:
+            - $ref: '#/components/schemas/SeekKey'
+            - type: 'null'
+          description: Seek key for the previous page. Null on the first page.
+
+    Problem:
+      type: object
+      description: RFC 7807 problem details.
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
