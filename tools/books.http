@@ -1,0 +1,76 @@
+
+@host = http://localhost:8080
+
+### First page — title asc, size 25.
+GET {{host}}/api/books?sort=title&dir=asc&size=25
+Accept: application/json
+
+> {%
+    var next = response.body.next;
+    var prev = response.body.prev;
+    client.global.set("nextValue", next ? next.value : "");
+    client.global.set("nextId",    next ? next.id    : "");
+    client.global.set("prevValue", prev ? prev.value : "");
+    client.global.set("prevId",    prev ? prev.id    : "");
+%}
+
+### Next page — uses seek key captured from the request above.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue={{nextValue}}&cursorId={{nextId}}
+Accept: application/json
+
+> {%
+    var next = response.body.next;
+    var prev = response.body.prev;
+    client.global.set("nextValue", next ? next.value : "");
+    client.global.set("nextId",    next ? next.id    : "");
+    client.global.set("prevValue", prev ? prev.value : "");
+    client.global.set("prevId",    prev ? prev.id    : "");
+%}
+
+### Prev page — uses prev seek key from the most recent paginated response.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue={{prevValue}}&cursorId={{prevId}}
+Accept: application/json
+
+### Sort by price desc, larger page.
+GET {{host}}/api/books?sort=price&dir=desc&size=100
+Accept: application/json
+
+### Sort by publishedAt asc, default page size.
+GET {{host}}/api/books?sort=publishedAt&dir=asc&size=50
+Accept: application/json
+
+### Filter: in-stock fantasy/sci-fi books over 4.0 stars, English, max €20.
+GET {{host}}/api/books?sort=rating&dir=desc&size=25&genre=Fantasy&genre=SciFi&language=English&inStock=true&minRating=4.0&priceMax=20
+Accept: application/json
+
+### Filter: published after 2020-01-01, sorted by date.
+GET {{host}}/api/books?sort=publishedAt&dir=desc&size=25&publishedAfter=2020-01-01
+Accept: application/json
+
+### Filter: price band.
+GET {{host}}/api/books?sort=price&dir=asc&size=25&priceMin=10&priceMax=15
+Accept: application/json
+
+###
+### --- Error cases (expect 400 application/problem+json) ---
+###
+
+### Half-set seek key — cursorValue without cursorId.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue=Hobbit
+Accept: application/json
+
+### cursorValue not parseable as the sort field's type (price wants a number).
+GET {{host}}/api/books?sort=price&dir=asc&size=25&cursorValue=banana&cursorId=1
+Accept: application/json
+
+### Invalid page size (only 25/50/100 are allowed).
+GET {{host}}/api/books?sort=title&dir=asc&size=42
+Accept: application/json
+
+### minRating out of range.
+GET {{host}}/api/books?sort=rating&dir=desc&size=25&minRating=9
+Accept: application/json
+
+### Unknown enum value.
+GET {{host}}/api/books?sort=title&dir=sideways&size=25
+Accept: application/json

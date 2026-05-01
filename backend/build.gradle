@@ -35,9 +35,11 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.6'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.22.0'
+    id 'com.diffplug.spotless' version '7.0.4'
 }
 
-group = 'com.example'
+group = 'ch.brogli'
 version = '0.0.1-SNAPSHOT'
 
 java {
@@ -55,6 +57,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-liquibase'
     implementation 'org.springframework.boot:spring-boot-starter-jooq'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Generated OpenAPI interfaces reference io.swagger.v3 annotations.
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.30'
     runtimeOnly 'org.postgresql:postgresql'
 }
 
@@ -111,7 +116,7 @@ tasks.register('generateJooq') {
                         .withInputSchema('public')
                         .withExcludes('databasechangelog|databasechangeloglock'))
                     .withTarget(new Target()
-                        .withPackageName('com.example.bookpagination.jooq')
+                        .withPackageName('ch.brogli.backendpagination.jooq')
                         .withDirectory(outDir.absolutePath)))
             GenerationTool.generate(config)
         } finally {
@@ -120,11 +125,75 @@ tasks.register('generateJooq') {
     }
 }
 
-tasks.named('compileJava') { dependsOn 'generateJooq' }
+tasks.named('compileJava') { dependsOn 'generateJooq', 'openApiGenerate' }
+
+def openapiOutputDir = layout.buildDirectory.dir('generated/openapi')
+
+def openapiSpec = "$projectDir/src/main/resources/openapi/openapi.yaml"
+
+openApiValidate {
+    inputSpec = openapiSpec
+    recommend = true
+}
+
+openApiGenerate {
+    generatorName = 'spring'
+    inputSpec = openapiSpec
+    outputDir = openapiOutputDir.get().asFile.absolutePath
+    apiPackage = 'ch.brogli.backendpagination.api'
+    modelPackage = 'ch.brogli.backendpagination.api.model'
+    invokerPackage = 'ch.brogli.backendpagination.api.invoker'
+    generateApiTests = false
+    generateModelTests = false
+    generateApiDocumentation = false
+    generateModelDocumentation = false
+    configOptions = [
+        interfaceOnly        : 'true',
+        skipDefaultInterface : 'true',
+        useSpringBoot4       : 'true',
+        useJackson3          : 'true',
+        useJakartaEe         : 'true',
+        useTags              : 'true',
+        openApiNullable      : 'false',
+        documentationProvider: 'none',
+        // Spring template hardcodes a config package; override it onto our
+        // scan root so EnumConverterConfiguration picks up @Configuration.
+        configPackage        : 'ch.brogli.backendpagination.api.config'
+    ]
+}
+
+sourceSets.main.java.srcDir layout.buildDirectory.dir('generated/openapi/src/main/java')
 
 tasks.named('bootBuildImage') {
     imageName = 'backend-pagination-with-jooq:local'
     docker {
         bindHostToBuilder = true
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        targetExclude 'build/**'
+        googleJavaFormat('1.27.0').aosp()
+        formatAnnotations()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    groovyGradle {
+        target '*.gradle'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format 'yaml', {
+        target 'src/main/resources/**/*.yml', 'src/main/resources/**/*.yaml'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format 'xml', {
+        target 'src/main/resources/**/*.xml'
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }

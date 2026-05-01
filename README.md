@@ -29,6 +29,17 @@ Then `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.
 
 Liquibase runs at startup against `db/changelog/master.xml`.
 
+## Format
+
+```bash
+cd backend
+./gradlew spotlessApply    # format
+./gradlew spotlessCheck    # verify (also runs as part of `check`)
+```
+
+Java is formatted with google-java-format (AOSP, 4-space indent). YAML, XML,
+and Gradle files get trailing-whitespace and final-newline normalization only.
+
 ## Build and run as a container
 
 `bootBuildImage` talks to the container runtime via a docker-compatible
