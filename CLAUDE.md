@@ -38,6 +38,14 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 - In Gradle task actions use `Driver.connect(...)` directly — `DriverManager.getConnection` rejects buildscript-classloader drivers.
 - `bootBuildImage` and codegen testcontainers need `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock` (set in `~/.bashrc`; inline-export for non-interactive shells).
 
+## Frontend (`:frontend`)
+
+- Vue 3 + PrimeVue 4 (styled mode) + Tailwind v4 + vue-router, ported from `opinionated-vuejs-starter`. **No Pinia, no Playwright** (vitest stays).
+- `gradle-node-plugin` (`com.github.node-gradle.node`) downloads Node + pnpm into `.gradle/nodejs/`; builds are hermetic, no nvm needed for `:frontend:assemble`. Node + pnpm versions are pinned in **two** places — `frontend/build.gradle` (`node { version, pnpmVersion }`) and `frontend/package.json` (`engines`, `packageManager`). Bump both together; renovate will not link them.
+- Outside Gradle, work in `frontend/` with system pnpm (use nvm or corepack).
+- Hey API codegen: `openapi-ts.config.ts` reads `../backend/src/main/resources/openapi/openapi.yaml`. Output `frontend/src/api/generated/` is gitignored. Runs as `predev` / `prebuild`.
+- API contract uses `cursorValue` / `cursorId` (not `afterValue` / `afterId`) — masterplan/design-frontend.md text predates the rename.
+
 ## OpenAPI
 
 - Set `configOptions { configPackage: 'ch.brogli.backendpagination.api.config' }` so generated config sits inside the `@SpringBootApplication` scan root.
@@ -52,6 +60,10 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 ./gradlew :backend:bootRun                                   # dev, no seed
 SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun      # dev + 1M-row seed
 ./gradlew :backend:bootBuildImage                            # OCI image
+
+./gradlew :frontend:pnpmDev                                  # vite dev server on :5173
+./gradlew :frontend:pnpmGenApi                               # regenerate Hey API client
+./gradlew :frontend:assemble                                 # type-check + vite build → dist/
 ```
 
 DataSource: `jdbc:postgresql://localhost:5432/books`, `postgres`/`postgres`. Override via `SPRING_DATASOURCE_*`.
