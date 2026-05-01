@@ -20,9 +20,8 @@ Postgres 16 listens on `localhost:5432`, db `books`, user/pass `postgres`/`postg
 ## Run the backend
 
 ```bash
-cd backend
-./gradlew bootRun                                  # no test data
-SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # seed 1M rows on first startup
+./gradlew :backend:bootRun                                  # no test data
+SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun     # seed 1M rows on first startup
 ```
 
 Then `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.
@@ -32,9 +31,8 @@ Liquibase runs at startup against `db/changelog/master.xml`.
 ## Format
 
 ```bash
-cd backend
-./gradlew spotlessApply    # format
-./gradlew spotlessCheck    # verify (also runs as part of `check`)
+./gradlew :backend:spotlessApply    # format
+./gradlew :backend:spotlessCheck    # verify (also runs as part of `check`)
 ```
 
 Java is formatted with google-java-format (AOSP, 4-space indent). YAML, XML,
@@ -53,8 +51,7 @@ echo 'export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"' >> ~/.b
 Then in a fresh shell:
 
 ```bash
-cd backend
-./gradlew bootBuildImage
+./gradlew :backend:bootBuildImage
 ```
 
 This produces `backend-pagination-with-jooq:local` via Paketo buildpacks
