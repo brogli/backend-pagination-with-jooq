@@ -1,65 +1,58 @@
 # Pagination wire protocol
 
-Keyset (a.k.a. cursor / seek) pagination over `/api/books`. Both
-request and response carry cursor position; the request as URL query
-params, the response as fields in the JSON body.
+Keyset pagination over `/api/books`. Cursor position is one opaque URL
+query param; the response carries adjacent cursors in the body. Cursor
+absence at an edge signals end-of-data — no separate boolean flags.
 
 ## Request
 
-The client always sends cursor position as URL query params:
-
 ```
-GET /api/books?sort=title&dir=asc&size=25
-                                            ← first page: no cursor
-GET /api/books?sort=title&dir=asc&size=25
-              &cursorValue=A%20Bridge%20%23106326&cursorId=106326
-                                            ← any subsequent page
+GET /api/books?sort=title&dir=asc&size=25                  # first page
+GET /api/books?sort=title&dir=asc&size=25&cursor=...       # subsequent
 ```
 
-`cursorValue` and `cursorId` are required-together: either both present
-or both absent. A half-set pair returns 400. Validation lives in
-`SearchBooksQuery.Cursor.fromOptional`, so the rest of the pipeline
-never sees a partial cursor.
-
-`cursorValue` is parsed according to the request's `sort` field —
-`String` for title/author, `BigDecimal` for price/rating, `LocalDate`
-for publishedAt. A parse failure returns 400.
+Pass `nextCursor` / `prevCursor` from the prior response back verbatim —
+clients must not parse, decode, or modify the string. The cursor binds
+to the `sort` and `dir` it was issued under: a mismatch, malformed
+payload, or unknown version returns 400.
 
 ## Response
 
 ```json
 {
   "content": [ /* page rows */ ],
-  "next": { "value": "A Bridge #113955", "id": 113955 },
-  "prev": { "value": "A Bridge #100307", "id": 100307 }
+  "nextCursor": "...",
+  "prevCursor": "..."
 }
 ```
 
-Either `next` or `prev` is `null` when that direction has no further
-page (`next` on the last page, `prev` on the first page).
+Either cursor is omitted (or null) at the corresponding edge. Detection
+is via a `limit + 1` peek, so a page that exactly fills the tail
+correctly omits `nextCursor` — no trailing-empty-page round trip.
 
-The client reads `body.next.value` / `body.next.id`, builds the next
-request as `?cursorValue=<v>&cursorId=<i>`, and re-fetches.
+## Cursor internals
 
-We don't emit an RFC 8288 `Link` header. The single consumer is the
-SPA front-end, which uses `body.next` / `body.prev` directly; a
-duplicate Link encoding would just be dead weight (YAGNI). Reconsider
-if a third-party consumer or generic pagination middleware ever shows
-up.
+The cursor identifies one row by `(sort_column_value, id)`; the `id`
+tiebreaker is required because the sort column alone isn't unique. The
+wire payload also carries a version, the sort field, direction, and a
+navigation hint. JSON-encoded then base64url without padding:
 
-## Cursor mechanics (briefly)
+```
+{ "v": 1, "sort": "title", "direction": "asc", "navigation": "NEXT", "value": "...", "id": 42 }
+```
 
-The cursor identifies one row in the sort order: `(sort_column_value,
-id)`. The `id` tiebreaker is required — the sort column alone isn't
-unique (multiple rows can share a title, price, etc.).
+`Cursor` is a sealed interface with one variant per column type family
+(`StringCursor`, `DecimalCursor`, `DateCursor`). Each carries a
+statically-typed `value`; Jackson coercion is configured to fail rather
+than silently convert (a numeric value for a string-sort cursor is
+rejected at decode, not coerced).
 
-`prev` is implemented via the same forward-seek primitive as `next`.
-The server back-computes the cursor that, when sent forward, lands on
-the previous page. See `BookRepository.findPrevSeed` for the
-`limit = size + 1` reverse-seek detail.
+Both directions share `BookRepository.fetchPage` — `Navigation.PREV`
+reverses `ORDER BY` internally and re-reverses the trimmed result back
+to forward order before returning.
 
 ## See also
 
 - OpenAPI spec: `backend/src/main/resources/openapi/openapi.yaml`
-- Implementation: `BookController`, `BookService`, `BookRepository`
+- Implementation: `BookController`, `BookService`, `BookRepository`, `Cursor`
 - Sample requests: `tools/books.http`

@@ -2,14 +2,7 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRouteQuery } from '@vueuse/router'
 import { searchBooks } from '@/api/generated/sdk.gen'
-import type {
-  BookDto,
-  Direction,
-  Genre,
-  Language,
-  SeekKey,
-  SortField,
-} from '@/api/generated/types.gen'
+import type { BookDto, Direction, Genre, Language, SortField } from '@/api/generated/types.gen'
 
 export type PageSize = 25 | 50 | 100
 
@@ -95,16 +88,18 @@ export function useBooks() {
 
   const { sort, dir, size } = useBookSorting()
 
-  const cursorValue = useRouteQuery<string | null>('cursorValue', null)
-  const cursorId = nullableNumber('cursorId')
+  const cursor = useRouteQuery<string | null>('cursor', null)
 
   const filters = useBookFilters()
 
   const rows = ref<BookDto[]>([])
-  const nextSeed = ref<SeekKey | null>(null)
-  const prevSeed = ref<SeekKey | null>(null)
+  const nextCursor = ref<string | null>(null)
+  const prevCursor = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  const canGoNext = computed(() => nextCursor.value !== null)
+  const canGoPrev = computed(() => prevCursor.value !== null)
 
   let pendingController: AbortController | null = null
 
@@ -121,8 +116,7 @@ export function useBooks() {
           sort: sort.value,
           dir: dir.value,
           size: size.value,
-          cursorValue: cursorValue.value ?? undefined,
-          cursorId: cursorId.value ?? undefined,
+          cursor: cursor.value ?? undefined,
           genre: filters.genre.value.length > 0 ? filters.genre.value : undefined,
           language: filters.language.value ?? undefined,
           inStock: filters.inStock.value ?? undefined,
@@ -140,8 +134,8 @@ export function useBooks() {
         return
       }
       rows.value = response.data?.content ?? []
-      nextSeed.value = response.data?.next ?? null
-      prevSeed.value = response.data?.prev ?? null
+      nextCursor.value = response.data?.nextCursor ?? null
+      prevCursor.value = response.data?.prevCursor ?? null
     } catch (cause) {
       if (controller.signal.aborted) return
       console.error('searchBooks failed', cause)
@@ -170,39 +164,31 @@ export function useBooks() {
       filters.publishedAfter,
     ],
     () => {
-      cursorValue.value = null
-      cursorId.value = null
+      cursor.value = null
     },
     { flush: 'sync' },
   )
 
-  function stringifyCursorValue(value: unknown): string {
-    if (typeof value === 'string') return value
-    if (typeof value === 'number') return String(value)
-    return String(value)
-  }
-
   // Cursor steps push so back/forward navigates page-by-page; everything else replaces.
-  function pushCursor(seed: SeekKey | null): void {
+  function pushCursor(value: string): void {
     void router.push({
       query: {
         ...route.query,
-        cursorValue: seed ? stringifyCursorValue(seed.value) : undefined,
-        cursorId: seed ? String(seed.id) : undefined,
+        cursor: value,
       },
     })
   }
 
   function goNext(): void {
-    if (nextSeed.value) pushCursor(nextSeed.value)
+    if (nextCursor.value !== null) {
+      pushCursor(nextCursor.value)
+    }
   }
 
-  const canGoNext = computed(() => nextSeed.value !== null)
-  // `prev: null` covers both "no prior" and "prior is the first page"; a URL cursor disambiguates.
-  const canGoPrev = computed(() => prevSeed.value !== null || cursorValue.value !== null)
-
   function goPrev(): void {
-    if (canGoPrev.value) pushCursor(prevSeed.value)
+    if (prevCursor.value !== null) {
+      pushCursor(prevCursor.value)
+    }
   }
 
   watch(
