@@ -2,7 +2,7 @@
 // can drive the SPA hermetically — Node + pnpm are downloaded into
 // `.gradle/nodejs/` so a fresh checkout with just JDK + Gradle can build.
 //
-// `assemble` produces dist/ for Phase 5 to embed into the backend jar; `pnpmDev`
+// `assemble` produces dist/ for :backend to embed into the jar; `pnpmDev`
 // is a long-running task you invoke manually for local development.
 plugins {
     id 'base'
