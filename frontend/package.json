@@ -16,7 +16,9 @@
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "oxfmt src/"
+    "format": "run-s format:*",
+    "format:src": "oxfmt src/",
+    "format:md": "cd .. && oxfmt '**/*.md'"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.0",
