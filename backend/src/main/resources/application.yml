@@ -1,6 +1,9 @@
 spring:
   application:
     name: backend-pagination-with-jooq
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/books}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
