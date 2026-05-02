@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-Concise notes for Claude. Human-facing docs in `README.md`.
-
 ## Layout
 
 - Multi-module Gradle build at the repo root. Subprojects: `:backend` (Spring Boot) and `:frontend` (Vue 3 + pnpm). Run `./gradlew` from the repo root, never global.
@@ -38,19 +36,30 @@ Concise notes for Claude. Human-facing docs in `README.md`.
 - In Gradle task actions use `Driver.connect(...)` directly — `DriverManager.getConnection` rejects buildscript-classloader drivers.
 - `bootBuildImage` and codegen testcontainers need `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock` (set in `~/.bashrc`; inline-export for non-interactive shells).
 
+## OpenAPI
+
+- Set `configOptions { configPackage: 'ch.brogli.backendpagination.api.config' }` so generated config sits inside the `@SpringBootApplication` scan root.
+- 3.1.1 idioms: `nullable: true` is removed — use `oneOf: [{$ref}, {type: 'null'}]` or `type: [string, "null"]`. `items: true` for "any"-typed arrays.
+- `prev` reverse seek uses `limit = size + 1` — forward `.seek()` is strictly greater-than, so the prior seed is `size` rows further back than the current first row.
+
 ## Frontend (`:frontend`)
 
 - Vue 3 + PrimeVue 4 (styled mode) + Tailwind v4 + vue-router, ported from `opinionated-vuejs-starter`. **No Pinia, no Playwright** (vitest stays).
 - `gradle-node-plugin` (`com.github.node-gradle.node`) downloads Node + pnpm into `.gradle/nodejs/`; builds are hermetic, no nvm needed for `:frontend:assemble`. Node + pnpm versions are pinned in **two** places — `frontend/build.gradle` (`node { version, pnpmVersion }`) and `frontend/package.json` (`engines`, `packageManager`). Bump both together; renovate will not link them.
 - Outside Gradle, work in `frontend/` with system pnpm (use nvm or corepack).
 - Hey API codegen: `openapi-ts.config.ts` reads `../backend/src/main/resources/openapi/openapi.yaml`. Output `frontend/src/api/generated/` is gitignored. Runs as `predev` / `prebuild`.
-- API contract uses `cursorValue` / `cursorId` (not `afterValue` / `afterId`) — masterplan/design-frontend.md text predates the rename.
 
-## OpenAPI
+### Frontend conventions
 
-- Set `configOptions { configPackage: 'ch.brogli.backendpagination.api.config' }` so generated config sits inside the `@SpringBootApplication` scan root.
-- 3.1.1 idioms: `nullable: true` is removed — use `oneOf: [{$ref}, {type: 'null'}]` or `type: [string, "null"]`. `items: true` for "any"-typed arrays.
-- `prev` reverse seek uses `limit = size + 1` — forward `.seek()` is strictly greater-than, so the prior seed is `size` rows further back than the current first row.
+- **Formatting**: oxc toolchain (oxlint + oxfmt) — no Prettier. oxfmt enforces no semicolons, single quotes; `.editorconfig` enforces 2-space indent, 100-char line. `pnpm lint` runs both with `--fix`.
+- **`if`/`else` always braced**. No single-line braceless form: `if (x) doSomething()` → `if (x) { doSomething() }`. Applies to early-return guards too.
+- **TypeScript strict**: no `any`, no implicit `any`. No non-null assertions (`!`) or `as` casts without a `// why:` comment. Exported APIs (functions, composables) need explicit param + return types; locals can infer. Treat external data (`fetch`, `JSON.parse`, `localStorage`) as `unknown` at the boundary and narrow.
+- **Vue SFCs**: type-based forms only — `defineProps<Props>()`, `defineEmits<{ change: [value: string] }>()`, `withDefaults(defineProps<Props>(), { ... })`. No runtime object form.
+- **PrimeVue**: components imported per-file (no global registration). All design-token overrides go in `src/theme/preset.ts` — don't inline theme tweaks in `main.ts` or component styles.
+- **Tailwind v4**: CSS-first config (no `tailwind.config.js`). Prefer utilities over scoped `<style>`; reserve `<style>` for what Tailwind can't express (keyframes, complex selectors). CSS layer order `theme, base, primevue, components, utilities` lives in `src/assets/main.css` and is mirrored in `main.ts` via `cssLayer` — keep them in sync.
+- **Path alias**: `@` → `src/` (`vite.config.ts` and tsconfigs).
+- **Views vs components**: `src/views/` = route targets, `src/components/` = reusable pieces. Component unit tests next to the component in `__tests__/*.spec.ts`.
+- `pnpm type-check` must pass with zero errors before any commit.
 
 ## Running
 
