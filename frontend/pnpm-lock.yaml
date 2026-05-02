@@ -37,7 +37,7 @@ importers:
         version: 5.0.6(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3))
     devDependencies:
       '@hey-api/openapi-ts':
-        specifier: ^0.86.0
+        specifier: 0.86.12
         version: 0.86.12(typescript@6.0.3)
       '@tailwindcss/vite':
         specifier: 4.2.4
