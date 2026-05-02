@@ -9,6 +9,7 @@
     "prebuild": "pnpm gen:api",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
+    "pretest:unit": "pnpm gen:api",
     "test:unit": "vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
