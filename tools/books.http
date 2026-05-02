@@ -6,29 +6,21 @@ GET {{host}}/api/books?sort=title&dir=asc&size=25
 Accept: application/json
 
 > {%
-    var next = response.body.next;
-    var prev = response.body.prev;
-    client.global.set("nextValue", next ? next.value : "");
-    client.global.set("nextId",    next ? next.id    : "");
-    client.global.set("prevValue", prev ? prev.value : "");
-    client.global.set("prevId",    prev ? prev.id    : "");
+    client.global.set("nextCursor", response.body.nextCursor || "");
+    client.global.set("prevCursor", response.body.prevCursor || "");
 %}
 
-### Next page — uses seek key captured from the request above.
-GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue={{nextValue}}&cursorId={{nextId}}
+### Next page — uses opaque cursor captured from the request above.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursor={{nextCursor}}
 Accept: application/json
 
 > {%
-    var next = response.body.next;
-    var prev = response.body.prev;
-    client.global.set("nextValue", next ? next.value : "");
-    client.global.set("nextId",    next ? next.id    : "");
-    client.global.set("prevValue", prev ? prev.value : "");
-    client.global.set("prevId",    prev ? prev.id    : "");
+    client.global.set("nextCursor", response.body.nextCursor || "");
+    client.global.set("prevCursor", response.body.prevCursor || "");
 %}
 
-### Prev page — uses prev seek key from the most recent paginated response.
-GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue={{prevValue}}&cursorId={{prevId}}
+### Prev page — uses prevCursor from the most recent paginated response.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursor={{prevCursor}}
 Accept: application/json
 
 ### Sort by price desc, larger page.
@@ -55,16 +47,16 @@ Accept: application/json
 ### --- Error cases (expect 400 application/problem+json) ---
 ###
 
-### Half-set seek key — cursorValue without cursorId.
-GET {{host}}/api/books?sort=title&dir=asc&size=25&cursorValue=Hobbit
+### Tampered / malformed cursor.
+GET {{host}}/api/books?sort=title&dir=asc&size=25&cursor=!!!not-base64!!!
 Accept: application/json
 
-### cursorValue not parseable as the sort field's type (price wants a number).
-GET {{host}}/api/books?sort=price&dir=asc&size=25&cursorValue=banana&cursorId=1
+### Cursor reused with a different sort (issued for title, sent with author).
+GET {{host}}/api/books?sort=author&dir=asc&size=25&cursor={{nextCursor}}
 Accept: application/json
 
-### Invalid page size (only 25/50/100 are allowed).
-GET {{host}}/api/books?sort=title&dir=asc&size=42
+### Page size out of range (max is 100).
+GET {{host}}/api/books?sort=title&dir=asc&size=200
 Accept: application/json
 
 ### minRating out of range.
@@ -73,4 +65,8 @@ Accept: application/json
 
 ### Unknown enum value.
 GET {{host}}/api/books?sort=title&dir=sideways&size=25
+Accept: application/json
+
+### priceMin > priceMax.
+GET {{host}}/api/books?sort=price&dir=asc&size=25&priceMin=50&priceMax=10
 Accept: application/json

@@ -7,6 +7,7 @@
 
     <include file="db/changelog/001-schema.sql"/>
     <include file="db/changelog/002-seed-large.sql"/>
-    <include file="db/changelog/003-indexes.sql"/>
+    <include file="db/changelog/003-seed-medium.sql"/>
+    <include file="db/changelog/004-indexes.sql"/>
 
 </databaseChangeLog>
