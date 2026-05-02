@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@hey-api/client-fetch':
-        specifier: ^0.13.0
-        version: 0.13.1(@hey-api/openapi-ts@0.86.12(typescript@6.0.3))
       '@primeuix/themes':
         specifier: ^2.0.3
         version: 2.0.3
@@ -359,12 +356,6 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
-
-  '@hey-api/client-fetch@0.13.1':
-    resolution: {integrity: sha512-29jBRYNdxVGlx5oewFgOrkulZckpIpBIRHth3uHFn1PrL2ucMy52FvWOY3U3dVx2go1Z3kUmMi6lr07iOpUqqA==}
-    deprecated: Starting with v0.73.0, this package is bundled directly inside @hey-api/openapi-ts.
-    peerDependencies:
-      '@hey-api/openapi-ts': < 2
 
   '@hey-api/codegen-core@0.3.3':
     resolution: {integrity: sha512-vArVDtrvdzFewu1hnjUm4jX1NBITlSCeO81EdWq676MxQbyxsGcDPAgohaSA+Wvr4HjPSvsg2/1s2zYxUtXebg==}
@@ -2819,10 +2810,6 @@ snapshots:
       levn: 0.4.1
 
   '@exodus/bytes@1.15.0': {}
-
-  '@hey-api/client-fetch@0.13.1(@hey-api/openapi-ts@0.86.12(typescript@6.0.3))':
-    dependencies:
-      '@hey-api/openapi-ts': 0.86.12(typescript@6.0.3)
 
   '@hey-api/codegen-core@0.3.3(typescript@6.0.3)':
     dependencies:
