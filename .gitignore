@@ -31,7 +31,6 @@ hs_err_pid*
 replay_pid*
 
 # Gradle wrapper jar must remain tracked (overrides *.jar above).
-# The ** prefix is important: our wrapper lives inside backend/, not the project root.
 !**/gradle/wrapper/gradle-wrapper.jar
 
 ### JetBrains IDEs (github/gitignore: Global/JetBrains.gitignore) ###

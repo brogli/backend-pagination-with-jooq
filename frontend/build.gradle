@@ -1,0 +1,59 @@
+// :frontend wraps pnpm via gradle-node-plugin so the multi-module Gradle build
+// can drive the SPA hermetically — Node + pnpm are downloaded into
+// `.gradle/nodejs/` so a fresh checkout with just JDK + Gradle can build.
+//
+// `assemble` produces dist/ for Phase 5 to embed into the backend jar; `pnpmDev`
+// is a long-running task you invoke manually for local development.
+plugins {
+    id 'base'
+    id 'com.github.node-gradle.node' version '7.1.0'
+}
+
+node {
+    // Pinned versions are the source of truth for CI; mirrors `engines` and
+    // `packageManager` in package.json. Update both together.
+    download = true
+    version = '24.15.0'
+    pnpmVersion = '10.33.2'
+}
+
+def openapiSpec = '../backend/src/main/resources/openapi/openapi.yaml'
+
+def pnpmGenApi = tasks.register('pnpmGenApi', PnpmTask) {
+    group = 'build'
+    description = 'Hey API codegen — typed fetch client from backend openapi.yaml.'
+    dependsOn 'pnpmInstall'
+    args = ['gen:api']
+    inputs.file openapiSpec
+    inputs.file 'openapi-ts.config.ts'
+    outputs.dir 'src/api/generated'
+}
+
+def pnpmBuild = tasks.register('pnpmBuild', PnpmTask) {
+    group = 'build'
+    description = 'pnpm build — type-check + vite build, output to dist/.'
+    dependsOn 'pnpmInstall', pnpmGenApi
+    args = ['build']
+    inputs.dir 'src'
+    inputs.file 'index.html'
+    inputs.file 'package.json'
+    inputs.file 'pnpm-lock.yaml'
+    inputs.file 'vite.config.ts'
+    inputs.file 'tsconfig.json'
+    inputs.file 'tsconfig.app.json'
+    inputs.file 'tsconfig.node.json'
+    outputs.dir 'dist'
+}
+
+tasks.register('pnpmDev', PnpmTask) {
+    group = 'application'
+    description = 'pnpm dev — Vite dev server on :5173 (long-running).'
+    dependsOn 'pnpmInstall', pnpmGenApi
+    args = ['dev']
+}
+
+assemble.dependsOn pnpmBuild
+
+clean {
+    delete 'dist', 'src/api/generated'
+}
