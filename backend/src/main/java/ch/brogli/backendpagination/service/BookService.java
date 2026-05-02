@@ -6,17 +6,17 @@ import ch.brogli.backendpagination.api.model.BookDto;
 import ch.brogli.backendpagination.api.model.BookPage;
 import ch.brogli.backendpagination.api.model.Direction;
 import ch.brogli.backendpagination.api.model.Genre;
-import ch.brogli.backendpagination.api.model.SeekKey;
 import ch.brogli.backendpagination.api.model.SortField;
-import ch.brogli.backendpagination.exception.BadRequestException;
-import ch.brogli.backendpagination.repository.BookRepository;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
+import ch.brogli.backendpagination.persistence.repository.BookRepository;
+import ch.brogli.backendpagination.persistence.repository.BookRepository.Anchor;
+import ch.brogli.backendpagination.persistence.repository.BookRepository.PageResult;
+import ch.brogli.backendpagination.service.cursor.Cursor;
+import ch.brogli.backendpagination.service.cursor.Navigation;
+import ch.brogli.backendpagination.service.cursor.SortValue;
 import java.util.List;
+import java.util.Optional;
 import org.jooq.Condition;
 import org.jooq.impl.DSL;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -29,55 +29,55 @@ public class BookService {
 
     public BookPage search(SearchBooksQuery query) {
         SortField sort = query.paging().sort();
-        Direction dir = query.paging().dir();
+        Direction direction = query.paging().direction();
         int size = query.paging().size();
+        Optional<Cursor> cursor = Optional.ofNullable(query.cursor());
 
-        SeekKey seekKey = parseSeekKey(sort, query.cursor());
+        Navigation navigation = cursor.map(Cursor::navigation).orElse(Navigation.NEXT);
+        Optional<Anchor> requestAnchor = cursor.map(c -> new Anchor(c.value(), c.id()));
         Condition where = buildConditions(query.filters());
 
-        List<BookDto> rows = repo.fetchPage(sort, dir, size, seekKey, where);
-
-        SeekKey next = nextCursor(rows, sort, size);
-        SeekKey prev = prevCursor(rows, sort, dir, size, seekKey, where);
-
-        return new BookPage(rows).next(next).prev(prev);
+        PageResult page = repo.fetchPage(sort, direction, navigation, size, requestAnchor, where);
+        List<BookDto> rows = page.rows();
+        if (rows.isEmpty()) {
+            return new BookPage(rows);
+        }
+        return buildPage(rows, sort, direction, navigation, page.hasMore(), cursor.isPresent());
     }
 
-    private static @Nullable SeekKey nextCursor(List<BookDto> rows, SortField sort, int size) {
-        if (rows.size() < size) return null;
-        BookDto last = rows.getLast();
-        return new SeekKey(sortValueOf(last, sort), last.getId());
-    }
-
-    private @Nullable SeekKey prevCursor(
+    private static BookPage buildPage(
             List<BookDto> rows,
             SortField sort,
-            Direction dir,
-            int size,
-            @Nullable SeekKey seekKey,
-            Condition where) {
-        if (seekKey == null || rows.isEmpty()) return null;
+            Direction direction,
+            Navigation navigation,
+            boolean hasMore,
+            boolean hasCursor) {
         BookDto first = rows.getFirst();
-        SeekKey currentFirstKey = new SeekKey(sortValueOf(first, sort), first.getId());
-        return repo.findPrevSeed(sort, dir, size, currentFirstKey, where);
-    }
-
-    private static @Nullable SeekKey parseSeekKey(
-            SortField sort, SearchBooksQuery.@Nullable Cursor cursor) {
-        if (cursor == null) return null;
-        Object parsedCursorValue;
-        try {
-            parsedCursorValue =
-                    switch (sort) {
-                        case TITLE, AUTHOR -> cursor.value();
-                        case PRICE, RATING -> new BigDecimal(cursor.value());
-                        case PUBLISHED_AT -> LocalDate.parse(cursor.value());
-                    };
-        } catch (NumberFormatException | DateTimeParseException e) {
-            throw new BadRequestException(
-                    "cursorValue is not a valid " + sort.getValue() + ": " + cursor.value());
-        }
-        return new SeekKey(parsedCursorValue, cursor.id());
+        BookDto last = rows.getLast();
+        Cursor next =
+                Cursor.of(
+                        sort,
+                        direction,
+                        Navigation.NEXT,
+                        SortValue.fromRow(last, sort),
+                        last.getId());
+        Cursor prev =
+                Cursor.of(
+                        sort,
+                        direction,
+                        Navigation.PREV,
+                        SortValue.fromRow(first, sort),
+                        first.getId());
+        return switch (navigation) {
+            case NEXT ->
+                    new BookPage(rows)
+                            .nextCursor(hasMore ? next.encode() : null)
+                            .prevCursor(hasCursor ? prev.encode() : null);
+            case PREV ->
+                    new BookPage(rows)
+                            .nextCursor(next.encode())
+                            .prevCursor(hasMore ? prev.encode() : null);
+        };
     }
 
     private static Condition buildConditions(SearchBooksQuery.Filters filters) {
@@ -106,15 +106,5 @@ public class BookService {
             where = where.and(BOOK.PUBLISHED_AT.ge(filters.publishedAfter()));
         }
         return where;
-    }
-
-    private static Object sortValueOf(BookDto row, SortField sort) {
-        return switch (sort) {
-            case TITLE -> row.getTitle();
-            case AUTHOR -> row.getAuthor();
-            case PRICE -> row.getPrice();
-            case RATING -> row.getRating();
-            case PUBLISHED_AT -> row.getPublishedAt();
-        };
     }
 }

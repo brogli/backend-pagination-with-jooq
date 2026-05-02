@@ -20,7 +20,7 @@
 - No integer-typed enums in `openapi.yaml` (Spring's `WebConversionService` won't chain `String → Integer → Enum`). Use bounded integers; string enums are fine.
 - No ternary across jOOQ DSL chain steps — branch the call. `step.seek(k)` and `step` are different types and the LUB loses `.limit(...)`.
 - No `--` inside Liquibase `<!-- ... -->` (SAX rejects).
-- Don't use `new Contexts()` (empty) to exclude — it matches everything. Use negation: `'!seed-large'`.
+- Don't use `new Contexts()` (empty) to exclude — it matches everything. Use negation: `'!seed-large'`. To exclude multiple contexts use a single AND expression (`'!seed-large and !seed-medium'`); comma is OR in Liquibase 5 and `'!a,!b'` accepts changesets tagged `a` because they satisfy `!b`.
 
 ## Boot 4 surprises
 
@@ -30,8 +30,8 @@
 
 ## Liquibase + jOOQ codegen
 
-- `master.xml` order is schema → seed → indexes (indexes after the seed for fast bulk insert).
-- `seed-large` is opt-in: `application.yml` excludes it; `application-local.yml` includes it; codegen excludes via `new Contexts('!seed-large')`.
+- `master.xml` order is schema → `seed-large` → `seed-medium` → indexes. Both seeds run before indexes (bulk insert into an unindexed table is dramatically faster); the two seed contexts are mutually exclusive so at most one ever contributes rows in a given Liquibase run.
+- Both seed changesets are opt-in via Liquibase contexts. Defaults exclude both (`application.yml` and codegen: `'!seed-large and !seed-medium'`). `application-local.yml` enables `seed-large` (1M-row dev seed). `application-index-audit.yml` enables `seed-medium` (100k-row test seed) and is activated by `IndexUsageIT` via `@ActiveProfiles("index-audit")`.
 - Seed dev DB with `SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun`. Re-seed by tearing down the pod or truncating.
 - In Gradle task actions use `Driver.connect(...)` directly — `DriverManager.getConnection` rejects buildscript-classloader drivers.
 - `bootBuildImage` and codegen testcontainers need `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock` (set in `~/.bashrc`; inline-export for non-interactive shells).
@@ -60,6 +60,37 @@
 - **Path alias**: `@` → `src/` (`vite.config.ts` and tsconfigs).
 - **Views vs components**: `src/views/` = route targets, `src/components/` = reusable pieces. Component unit tests next to the component in `__tests__/*.spec.ts`.
 - `pnpm type-check` must pass with zero errors before any commit.
+
+## Pagination index contract
+
+EXPLAIN-driven matrix (100k-row `seed-medium` fixture, `LIMIT 25`). Asserted by `IndexUsageIT` — when you change a row, change the test.
+
+| Verdict | Meaning |
+|---|---|
+| `fast` | Aligned composite index, Index Only Scan |
+| `acceptable` | Index Scan on the sort index with post-filter; planner avoids Seq Scan thanks to LIMIT + selectivity |
+| `cliff` | No usable index path — Seq Scan; must not occur in this matrix |
+
+| Sort | Filter | Index used | Verdict |
+|---|---|---|---|
+| title | none | `book_title_id_idx` | fast |
+| author | none | `book_author_id_idx` | fast |
+| price | none | `book_price_id_idx` | fast |
+| rating | none | `book_rating_id_idx` | fast |
+| publishedAt | none | `book_published_at_id_idx` | fast |
+| price | genre = single | `book_genre_price_id_idx` | fast |
+| price | genre IN (≥2) | `book_price_id_idx` | acceptable |
+| rating | inStock | `book_in_stock_rating_id_idx` | fast |
+| publishedAt | language | `book_language_published_at_id_idx` | fast |
+| price | genre + inStock | `book_genre_price_id_idx` | fast |
+| price | minRating | `book_price_id_idx` | acceptable |
+| publishedAt | priceMin | `book_published_at_id_idx` | acceptable |
+| title | publishedAfter | `book_title_id_idx` | acceptable |
+| title | language (no composite) | `book_title_id_idx` | acceptable |
+
+Partial-index re-eval on `book_in_stock_rating_id_idx`: hypothetical `(rating, id) WHERE in_stock = true` does **not** displace the existing composite — planner stays on the composite for both `inStock=true` and `inStock=false` reads. Keep the composite, do not ship the partial. Asserted by `IndexUsageIT#partialInStockRatingIndexDoesNotDisplaceComposite`.
+
+Multi-genre `IN (...)` switches off the genre composite (planner picks the plain price index). Single-genre stays on the composite. Don't add a `(genre[], price, id)` covering index for this — `acceptable` is correct.
 
 ## Running
 

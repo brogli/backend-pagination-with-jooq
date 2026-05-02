@@ -1,0 +1,4 @@
+spring:
+  liquibase:
+    # Activate the 100k-row seed-medium fixture for index-plan tests.
+    contexts: seed-medium

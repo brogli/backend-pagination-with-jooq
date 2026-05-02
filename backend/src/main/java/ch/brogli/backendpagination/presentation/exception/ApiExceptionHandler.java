@@ -1,6 +1,5 @@
-package ch.brogli.backendpagination.controller;
+package ch.brogli.backendpagination.presentation.exception;
 
-import ch.brogli.backendpagination.exception.BadRequestException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;

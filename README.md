@@ -72,6 +72,20 @@ pnpm type-check     # vue-tsc --build
 pnpm test:unit      # Vitest (jsdom)
 ```
 
+## Run tests
+
+```bash
+./gradlew :backend:test
+```
+
+Some Integration tests can reuse a containre. Opt in once per machine:
+
+```bash
+echo 'testcontainers.reuse.enable=true' >> ~/.testcontainers.properties
+```
+
+Without the flag tests still pass — each run just starts a fresh container.
+
 ## Build and run as a container
 
 `bootBuildImage` talks to the container runtime via a docker-compatible
