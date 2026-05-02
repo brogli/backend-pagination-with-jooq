@@ -72,6 +72,10 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
 }
 
 def jooqOutputDir = layout.buildDirectory.dir('generated/jooq')

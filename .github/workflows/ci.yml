@@ -13,6 +13,9 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -32,12 +35,23 @@ jobs:
         # static assets at runtime.
         run: ./gradlew :backend:check -x copyFrontend
 
+      - name: Publish test report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
+        with:
+          report_paths: 'backend/build/test-results/test/*.xml'
+          check_name: Backend tests
+          detailed_summary: true
+          include_passed: true
+
       - name: Upload test reports
-        if: ${{ !cancelled() && failure() }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: backend-test-reports
-          path: backend/build/reports/tests/
+          path: |
+            backend/build/reports/tests/
+            backend/build/test-results/
           retention-days: 7
 
   frontend:
