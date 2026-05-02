@@ -55,20 +55,55 @@ paths:
           schema:
             type: integer
             format: int64
-        - name: filters
+        - name: genre
           in: query
           required: false
-          style: form
-          explode: true
-          description: |
-            All toolbar filters bundled into one object. Wire format is
-            the usual flat query string (`?language=English&inStock=true`)
-            because `explode: true` means each property becomes its own
-            query param. The `genre` array is repeated-keys
-            (`?genre=Fantasy&genre=SciFi`) — standard form-explode
-            encoding for arrays inside an exploded object.
+          description: Match mode `in` — repeat the param for multi-select (`?genre=Fantasy&genre=SciFi`).
           schema:
-            $ref: '#/components/schemas/BookFilters'
+            type: array
+            items:
+              $ref: '#/components/schemas/Genre'
+        - name: language
+          in: query
+          required: false
+          description: Single-language equality filter. Omit to include all languages.
+          schema:
+            $ref: '#/components/schemas/Language'
+        - name: inStock
+          in: query
+          required: false
+          description: Stock-status filter. Omit to include both states.
+          schema:
+            type: boolean
+        - name: minRating
+          in: query
+          required: false
+          description: Match mode `gte`. 0–5.
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+        - name: priceMin
+          in: query
+          required: false
+          description: Match mode `gte` against `price`.
+          schema:
+            type: number
+            minimum: 0
+        - name: priceMax
+          in: query
+          required: false
+          description: Match mode `lte` against `price`.
+          schema:
+            type: number
+            minimum: 0
+        - name: publishedAfter
+          in: query
+          required: false
+          description: Match mode `gte` against `publishedAt`.
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: A page of books.
@@ -100,35 +135,6 @@ components:
     Language:
       type: string
       enum: [English, German, French, Spanish, Japanese]
-
-    BookFilters:
-      type: object
-      description: |
-        Bundled toolbar filters carried as exploded query params. Match
-        mode is `in` for `genre` (multi-select), `equals` for scalars,
-        `gte`/`lte` for the range fields.
-      properties:
-        genre:
-          type: array
-          items:
-            $ref: '#/components/schemas/Genre'
-        language:
-          $ref: '#/components/schemas/Language'
-        inStock:
-          type: boolean
-        minRating:
-          type: number
-          minimum: 0
-          maximum: 5
-        priceMin:
-          type: number
-          minimum: 0
-        priceMax:
-          type: number
-          minimum: 0
-        publishedAfter:
-          type: string
-          format: date
 
     BookDto:
       type: object
