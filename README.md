@@ -2,15 +2,17 @@
 
 ## About
 
-Backend pagination by Spring default and JPA uses LIMIT/OFFSET. But this isn't available with JOOQ
-and it has an underlying scaling issue. The answer to this is, or so I've read, keyset pagination.
+Spring JPA can do
+[offset and keyset based pagination](https://docs.spring.io/spring-data/jpa/reference/repositories/query-methods-details.html#repositories.scrolling.guidance).
+With JOOQ you have to hand-roll it. Since offset based pagination doesn't scale well, I went for a
+keyset pagination POC.
 
-So here comes a keyset-pagination POC. A Vue 3 + PrimeVue 4 SPA browses a 1M-row Postgres table
-through a Spring Boot 4 backend that uses jOOQ's `seek()` for keyset pagination. Page cost stays
-constant regardless of depth, unlike `LIMIT/OFFSET`. The seek key travels as an opaque
-base64-encoded cursor in a query param, so refresh, bookmarks, and browser back/forward all
-round-trip. Each page response carries both `nextCursor` and `prevCursor`, enabling bidirectional
-walking without a client-side stack. Detailed design lives in [`docs/`](./docs/).
+A Vue 3 + PrimeVue 4 SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
+jOOQ's `seek()` for keyset pagination. Page cost stays constant regardless of depth, unlike
+`LIMIT/OFFSET`. The seek key travels as an opaque base64-encoded cursor in a query param, so
+refresh, bookmarks, and browser back/forward all round-trip. Each page response carries both
+`nextCursor` and `prevCursor`, enabling bidirectional walking without a client-side stack. Detailed
+design lives in [`docs/`](./docs/).
 
 ## Findings
 
