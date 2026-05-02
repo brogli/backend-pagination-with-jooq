@@ -1,13 +1,12 @@
 --liquibase formatted sql
 
--- Created after the seed (002) so that on a fresh dev DB started with the
--- local profile, the bulk insert hits an unindexed table (no per-row B-tree
--- maintenance) and indexes are built once against the populated table —
--- Postgres uses parallel maintenance workers for the per-index sort.
--- Without the local profile, this changeset still runs (untagged) but
--- against an empty table, so it's instant.
+-- Runs after both seed variants (002 seed-large, 003 seed-medium). Bulk insert
+-- into an unindexed table is dramatically faster — Postgres uses parallel
+-- maintenance workers to build each index once against the populated table.
+-- The two seed contexts are mutually exclusive, so at most one of them
+-- contributes rows on any given Liquibase run.
 
---changeset phase2:003-indexes runInTransaction:false
+--changeset phase2:004-indexes runInTransaction:false
 SET maintenance_work_mem = '256MB';
 SET max_parallel_maintenance_workers = 4;
 

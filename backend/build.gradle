@@ -61,6 +61,16 @@ dependencies {
     // Generated OpenAPI interfaces reference io.swagger.v3 annotations.
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.30'
     runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.3'
+    testImplementation 'org.testcontainers:postgresql:1.21.3'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 def jooqOutputDir = layout.buildDirectory.dir('generated/jooq')
@@ -98,7 +108,7 @@ tasks.register('generateJooq') {
                     'db/changelog/master.xml',
                     new DirectoryResourceAccessor(file('build/resources/main')),
                     db
-                ).update(new Contexts('!seed-large'))
+                ).update(new Contexts('!seed-large and !seed-medium'))
             }
 
             def outDir = jooqOutputDir.get().asFile

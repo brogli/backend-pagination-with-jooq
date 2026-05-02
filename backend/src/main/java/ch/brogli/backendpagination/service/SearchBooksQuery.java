@@ -4,7 +4,7 @@ import ch.brogli.backendpagination.api.model.Direction;
 import ch.brogli.backendpagination.api.model.Genre;
 import ch.brogli.backendpagination.api.model.Language;
 import ch.brogli.backendpagination.api.model.SortField;
-import ch.brogli.backendpagination.exception.BadRequestException;
+import ch.brogli.backendpagination.service.cursor.Cursor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,23 +12,7 @@ import org.jspecify.annotations.Nullable;
 
 public record SearchBooksQuery(Paging paging, @Nullable Cursor cursor, Filters filters) {
 
-    public record Paging(SortField sort, Direction dir, int size) {}
-
-    /**
-     * Cursor anchor row. Both fields are mandatory by construction; the "both-or-neither"
-     * wire-level pair is normalized through {@link #fromOptional}, so downstream code never sees a
-     * half-set cursor.
-     */
-    public record Cursor(String value, long id) {
-        public static @Nullable Cursor fromOptional(@Nullable String value, @Nullable Long id) {
-            boolean hasValue = value != null && !value.isBlank();
-            boolean hasId = id != null;
-            if (hasValue != hasId) {
-                throw new BadRequestException("cursorValue and cursorId must be provided together");
-            }
-            return hasValue ? new Cursor(value, id) : null;
-        }
-    }
+    public record Paging(SortField sort, Direction direction, int size) {}
 
     public record Filters(
             @Nullable List<Genre> genre,
