@@ -117,3 +117,6 @@ http-client.private.env.json
 
 ### VS Code ###
 .vscode/
+
+### Load test artifacts ###
+tools/load/out/
