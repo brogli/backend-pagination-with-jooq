@@ -1,5 +1,7 @@
 # Backend Pagination With Jooq
 
+[![CI](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml/badge.svg)](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml)
+
 ## About
 
 Spring JPA can do
