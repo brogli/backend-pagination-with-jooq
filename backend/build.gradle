@@ -25,7 +25,7 @@ buildscript {
     dependencies {
         classpath 'org.liquibase:liquibase-core:5.0.2'
         classpath 'org.postgresql:postgresql:42.7.10'
-        classpath 'org.testcontainers:postgresql:1.21.3'
+        classpath 'org.testcontainers:postgresql:1.21.4'
         classpath 'org.jooq:jooq-codegen:3.19.32'
         classpath 'org.jooq:jooq-meta:3.19.32'
     }
@@ -66,8 +66,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-    testImplementation 'org.testcontainers:junit-jupiter:1.21.3'
-    testImplementation 'org.testcontainers:postgresql:1.21.3'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
+    testImplementation 'org.testcontainers:postgresql:1.21.4'
 }
 
 tasks.named('test') {
