@@ -2,6 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
   "minimumReleaseAge": "7 days",
+  "platformAutomerge": true,
   "packageRules": [
     {
       "description": "Auto-merge minor and patch updates",
@@ -15,7 +16,6 @@
       "automerge": false
     }
   ],
-  "platformAutomerge": false,
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true
