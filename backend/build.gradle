@@ -27,7 +27,7 @@ buildscript {
         classpath 'org.postgresql:postgresql:42.7.10'
         classpath 'org.testcontainers:postgresql:1.21.4'
         classpath 'org.jooq:jooq-codegen:3.19.32'
-        classpath 'org.jooq:jooq-meta:3.19.32'
+        classpath 'org.jooq:jooq-meta:3.21.2'
     }
 }
 
