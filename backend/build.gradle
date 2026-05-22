@@ -23,7 +23,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.liquibase:liquibase-core:5.0.2'
+        classpath 'org.liquibase:liquibase-core:5.0.3'
         classpath 'org.postgresql:postgresql:42.7.11'
         classpath 'org.testcontainers:postgresql:1.21.4'
         classpath 'org.jooq:jooq-codegen:3.19.32'
