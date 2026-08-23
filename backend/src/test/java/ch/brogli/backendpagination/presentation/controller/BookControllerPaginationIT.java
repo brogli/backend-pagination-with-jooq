@@ -5,8 +5,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.Objects;
 import org.hamcrest.Matchers;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,13 +46,7 @@ class BookControllerPaginationIT {
 
         String cursor = walkToLastPage(10);
 
-        mockMvc.perform(
-                        get("/api/books")
-                                .param("sort", "title")
-                                .param("dir", "asc")
-                                .param("size", "10")
-                                .param("cursor", cursor))
-                .andExpect(status().isOk())
+        fetchPage("asc", 10, cursor)
                 .andExpect(jsonPath("$.content", Matchers.hasSize(10)))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist())
                 .andExpect(jsonPath("$.prevCursor").isString());
@@ -59,12 +56,7 @@ class BookControllerPaginationIT {
     void firstPageOmitsPrevCursor() throws Exception {
         seedRowsTitleOrderedByIndex(30);
 
-        mockMvc.perform(
-                        get("/api/books")
-                                .param("sort", "title")
-                                .param("dir", "asc")
-                                .param("size", "10"))
-                .andExpect(status().isOk())
+        fetchPage("asc", 10, null)
                 .andExpect(jsonPath("$.content", Matchers.hasSize(10)))
                 .andExpect(jsonPath("$.prevCursor").doesNotExist())
                 .andExpect(jsonPath("$.nextCursor").isString());
@@ -74,7 +66,7 @@ class BookControllerPaginationIT {
     void cursorReusedWithDifferentSort_returns400() throws Exception {
         seedRowsTitleOrderedByIndex(30);
 
-        String cursor = readNextCursor(fetchFirstPageBody(10));
+        String cursor = readNextCursor(body(fetchPage("asc", 10, null)));
 
         mockMvc.perform(
                         get("/api/books")
@@ -87,16 +79,62 @@ class BookControllerPaginationIT {
                         jsonPath("$.detail", Matchers.containsString("different sort/direction")));
     }
 
-    private String fetchFirstPageBody(int pageSize) throws Exception {
-        return mockMvc.perform(
-                        get("/api/books")
-                                .param("sort", "title")
-                                .param("dir", "asc")
-                                .param("size", Integer.toString(pageSize)))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+    @Test
+    void nextThenPrev_returnsFirstPageInForwardOrder_withoutPrevCursor() throws Exception {
+        // Page 1 is T001..T010. Walking NEXT then PREV must land on exactly page 1 again, rows
+        // in forward order (the PREV seek runs reversed and is re-reversed before returning),
+        // and prevCursor must be null because the extra lookahead row does not exist.
+        seedRowsTitleOrderedByIndex(30);
+
+        String page1 = body(fetchPage("asc", 10, null));
+        String page2 = body(fetchPage("asc", 10, readNextCursor(page1)));
+
+        fetchPage("asc", 10, readPrevCursor(page2))
+                .andExpect(jsonPath("$.content", Matchers.hasSize(10)))
+                .andExpect(jsonPath("$.content[0].title").value("T001"))
+                .andExpect(jsonPath("$.content[9].title").value("T010"))
+                .andExpect(jsonPath("$.prevCursor").doesNotExist())
+                .andExpect(jsonPath("$.nextCursor").isString());
+    }
+
+    @Test
+    void prevFromMiddlePage_keepsBothCursors_andNextLeadsBackToSamePage() throws Exception {
+        // Page 3 is T021..T030. PREV from page 3 gives page 2 (T011..T020) with both cursors
+        // set. Following that page's nextCursor must return page 3 again.
+        seedRowsTitleOrderedByIndex(30);
+
+        String page1 = body(fetchPage("asc", 10, null));
+        String page2 = body(fetchPage("asc", 10, readNextCursor(page1)));
+        String page3 = body(fetchPage("asc", 10, readNextCursor(page2)));
+
+        String backToPage2 =
+                body(
+                        fetchPage("asc", 10, readPrevCursor(page3))
+                                .andExpect(jsonPath("$.content[0].title").value("T011"))
+                                .andExpect(jsonPath("$.content[9].title").value("T020"))
+                                .andExpect(jsonPath("$.prevCursor").isString())
+                                .andExpect(jsonPath("$.nextCursor").isString()));
+
+        fetchPage("asc", 10, readNextCursor(backToPage2))
+                .andExpect(jsonPath("$.content[0].title").value("T021"))
+                .andExpect(jsonPath("$.content[9].title").value("T030"));
+    }
+
+    @Test
+    void prevWithDescDirection_reversesCorrectly() throws Exception {
+        // dir=desc: page 1 is T030..T021, page 2 is T020..T011. PREV from page 2 must give
+        // T030..T021 again (still descending).
+        seedRowsTitleOrderedByIndex(30);
+
+        String page1 = body(fetchPage("desc", 10, null));
+        String page2 = body(fetchPage("desc", 10, readNextCursor(page1)));
+
+        fetchPage("desc", 10, readPrevCursor(page2))
+                .andExpect(jsonPath("$.content", Matchers.hasSize(10)))
+                .andExpect(jsonPath("$.content[0].title").value("T030"))
+                .andExpect(jsonPath("$.content[9].title").value("T021"))
+                .andExpect(jsonPath("$.prevCursor").doesNotExist())
+                .andExpect(jsonPath("$.nextCursor").isString());
     }
 
     /**
@@ -107,27 +145,36 @@ class BookControllerPaginationIT {
         String cursor = null;
         // Walk to page 9; cursor returned points at page 10.
         for (int i = 1; i <= 9; i++) {
-            var req =
-                    get("/api/books")
-                            .param("sort", "title")
-                            .param("dir", "asc")
-                            .param("size", Integer.toString(pageSize));
-            if (cursor != null) {
-                req = req.param("cursor", cursor);
-            }
-            String body =
-                    mockMvc.perform(req)
-                            .andExpect(status().isOk())
-                            .andReturn()
-                            .getResponse()
-                            .getContentAsString();
-            cursor = readNextCursor(body);
+            cursor = readNextCursor(body(fetchPage("asc", pageSize, cursor)));
         }
         return cursor;
     }
 
     private static String readNextCursor(String body) {
-        return JsonPath.read(body, "$.nextCursor");
+        return Objects.requireNonNull(
+                JsonPath.read(body, "$.nextCursor"), "nextCursor missing in " + body);
+    }
+
+    private static String readPrevCursor(String body) {
+        return Objects.requireNonNull(
+                JsonPath.read(body, "$.prevCursor"), "prevCursor missing in " + body);
+    }
+
+    private ResultActions fetchPage(String dir, int size, @Nullable String cursor)
+            throws Exception {
+        var req =
+                get("/api/books")
+                        .param("sort", "title")
+                        .param("dir", dir)
+                        .param("size", Integer.toString(size));
+        if (cursor != null) {
+            req = req.param("cursor", cursor);
+        }
+        return mockMvc.perform(req).andExpect(status().isOk());
+    }
+
+    private static String body(ResultActions result) throws Exception {
+        return result.andReturn().getResponse().getContentAsString();
     }
 
     private void seedRowsTitleOrderedByIndex(int n) {
