@@ -12,7 +12,6 @@ import ch.brogli.backendpagination.persistence.repository.BookRepository.Anchor;
 import ch.brogli.backendpagination.persistence.repository.BookRepository.PageResult;
 import ch.brogli.backendpagination.service.cursor.Cursor;
 import ch.brogli.backendpagination.service.cursor.Navigation;
-import ch.brogli.backendpagination.service.cursor.SortValue;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.Condition;
@@ -31,10 +30,11 @@ public class BookService {
         SortField sort = query.paging().sort();
         Direction direction = query.paging().direction();
         int size = query.paging().size();
-        Optional<Cursor> cursor = Optional.ofNullable(query.cursor());
+        Cursor cursor = query.cursor();
 
-        Navigation navigation = cursor.map(Cursor::navigation).orElse(Navigation.NEXT);
-        Optional<Anchor> requestAnchor = cursor.map(c -> new Anchor(c.value(), c.id()));
+        Navigation navigation = cursor == null ? Navigation.NEXT : cursor.navigation();
+        Optional<Anchor> requestAnchor =
+                Optional.ofNullable(cursor).map(c -> new Anchor(c.value(), c.id()));
         Condition where = buildConditions(query.filters());
 
         PageResult page = repo.fetchPage(sort, direction, navigation, size, requestAnchor, where);
@@ -42,7 +42,7 @@ public class BookService {
         if (rows.isEmpty()) {
             return new BookPage(rows);
         }
-        return buildPage(rows, sort, direction, navigation, page.hasMore(), cursor.isPresent());
+        return buildPage(rows, sort, direction, navigation, page.hasMore(), cursor != null);
     }
 
     private static BookPage buildPage(
@@ -52,22 +52,8 @@ public class BookService {
             Navigation navigation,
             boolean hasMore,
             boolean hasCursor) {
-        BookDto first = rows.getFirst();
-        BookDto last = rows.getLast();
-        Cursor next =
-                Cursor.of(
-                        sort,
-                        direction,
-                        Navigation.NEXT,
-                        SortValue.fromRow(last, sort),
-                        last.getId());
-        Cursor prev =
-                Cursor.of(
-                        sort,
-                        direction,
-                        Navigation.PREV,
-                        SortValue.fromRow(first, sort),
-                        first.getId());
+        Cursor next = Cursor.fromRow(rows.getLast(), sort, direction, Navigation.NEXT);
+        Cursor prev = Cursor.fromRow(rows.getFirst(), sort, direction, Navigation.PREV);
         return switch (navigation) {
             case NEXT ->
                     new BookPage(rows)
