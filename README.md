@@ -12,9 +12,10 @@ keyset pagination POC.
 A Vue 3 + PrimeVue 4 SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
 jOOQ's `seek()` for keyset pagination. Page cost stays constant regardless of depth, unlike
 `LIMIT/OFFSET`. The seek key travels as an opaque base64-encoded cursor in a query param, so
-refresh, bookmarks, and browser back/forward all round-trip. Each page response carries both
-`nextCursor` and `prevCursor`, enabling bidirectional walking without a client-side stack. Detailed
-design lives in [`docs/`](./docs/).
+refresh, bookmarks, and browser back/forward all round-trip. A cursor is bound to the sort, direction
+and filter set it was issued under, and a stale cursor falls back to page one. Each page response
+carries both `nextCursor` and `prevCursor`, enabling bidirectional walking without a client-side
+stack. Detailed design lives in [`docs/`](./docs/).
 
 ## Findings
 
