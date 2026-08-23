@@ -80,6 +80,33 @@ class BookControllerPaginationIT {
     }
 
     @Test
+    void cursorReusedWithDifferentFilters_returns400() throws Exception {
+        seedRowsTitleOrderedByIndex(30);
+
+        String cursor = readNextCursor(body(fetchPage("asc", 10, null)));
+
+        mockMvc.perform(
+                        get("/api/books")
+                                .param("sort", "title")
+                                .param("dir", "asc")
+                                .param("size", "10")
+                                .param("inStock", "true")
+                                .param("cursor", cursor))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", Matchers.containsString("different filter set")));
+    }
+
+    @Test
+    void cursorReusedWithSameFiltersInDifferentGenreOrder_isAccepted() throws Exception {
+        seedRowsTitleOrderedByIndex(30);
+
+        String firstPage = body(fetchPage("asc", 10, null, "Fantasy", "SciFi"));
+
+        fetchPage("asc", 10, readNextCursor(firstPage), "SciFi", "Fantasy")
+                .andExpect(jsonPath("$.content[0].title").value("T011"));
+    }
+
+    @Test
     void nextThenPrev_returnsFirstPageInForwardOrder_withoutPrevCursor() throws Exception {
         // Page 1 is T001..T010. Walking NEXT then PREV must land on exactly page 1 again, rows
         // in forward order (the PREV seek runs reversed and is re-reversed before returning),
@@ -160,7 +187,7 @@ class BookControllerPaginationIT {
                 JsonPath.read(body, "$.prevCursor"), "prevCursor missing in " + body);
     }
 
-    private ResultActions fetchPage(String dir, int size, @Nullable String cursor)
+    private ResultActions fetchPage(String dir, int size, @Nullable String cursor, String... genres)
             throws Exception {
         var req =
                 get("/api/books")
@@ -169,6 +196,9 @@ class BookControllerPaginationIT {
                         .param("size", Integer.toString(size));
         if (cursor != null) {
             req = req.param("cursor", cursor);
+        }
+        if (genres.length > 0) {
+            req = req.param("genre", genres);
         }
         return mockMvc.perform(req).andExpect(status().isOk());
     }

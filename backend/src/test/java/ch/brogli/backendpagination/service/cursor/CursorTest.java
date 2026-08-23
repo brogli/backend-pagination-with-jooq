@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 class CursorTest {
 
+    private static final String FP = "fp000000000";
+
     private static String b64(String json) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes());
     }
@@ -29,6 +31,7 @@ class CursorTest {
                                             SortField.TITLE,
                                             Direction.ASC,
                                             Navigation.NEXT,
+                                            FP,
                                             new BigDecimal("1"),
                                             1L))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -38,6 +41,7 @@ class CursorTest {
                                             SortField.PRICE,
                                             Direction.ASC,
                                             Navigation.NEXT,
+                                            FP,
                                             "9.99",
                                             1L))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -47,9 +51,24 @@ class CursorTest {
                                             SortField.PUBLISHED_AT,
                                             Direction.ASC,
                                             Navigation.NEXT,
+                                            FP,
                                             "2020-01-01",
                                             1L))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void rejectsNullFiltersAtConstruction() {
+            assertThatThrownBy(
+                            () ->
+                                    new Cursor(
+                                            SortField.TITLE,
+                                            Direction.ASC,
+                                            Navigation.NEXT,
+                                            null,
+                                            "x",
+                                            1L))
+                    .isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -63,10 +82,11 @@ class CursorTest {
                             SortField.TITLE,
                             Direction.ASC,
                             Navigation.NEXT,
+                            FP,
                             "Hitchhiker's Guide",
                             42L);
 
-            Optional<Cursor> out = Cursor.decode(in.encode(), SortField.TITLE, Direction.ASC);
+            Optional<Cursor> out = Cursor.decode(in.encode(), SortField.TITLE, Direction.ASC, FP);
 
             assertThat(out).contains(in);
         }
@@ -74,9 +94,10 @@ class CursorTest {
         @Test
         void preservesBigDecimalScaleForPrice() {
             BigDecimal price = new BigDecimal("19.99");
-            Cursor in = new Cursor(SortField.PRICE, Direction.DESC, Navigation.NEXT, price, 7L);
+            Cursor in = new Cursor(SortField.PRICE, Direction.DESC, Navigation.NEXT, FP, price, 7L);
 
-            Cursor out = Cursor.decode(in.encode(), SortField.PRICE, Direction.DESC).orElseThrow();
+            Cursor out =
+                    Cursor.decode(in.encode(), SortField.PRICE, Direction.DESC, FP).orElseThrow();
 
             assertThat(out).isEqualTo(in);
             assertThat(((BigDecimal) out.value()).scale()).isEqualTo(2);
@@ -89,10 +110,12 @@ class CursorTest {
                             SortField.RATING,
                             Direction.ASC,
                             Navigation.PREV,
+                            FP,
                             new BigDecimal("4.0"),
                             3L);
 
-            Cursor out = Cursor.decode(in.encode(), SortField.RATING, Direction.ASC).orElseThrow();
+            Cursor out =
+                    Cursor.decode(in.encode(), SortField.RATING, Direction.ASC, FP).orElseThrow();
 
             assertThat(out).isEqualTo(in);
         }
@@ -104,11 +127,12 @@ class CursorTest {
                             SortField.PUBLISHED_AT,
                             Direction.ASC,
                             Navigation.PREV,
+                            FP,
                             LocalDate.of(2024, 5, 17),
                             99L);
 
             Optional<Cursor> out =
-                    Cursor.decode(in.encode(), SortField.PUBLISHED_AT, Direction.ASC);
+                    Cursor.decode(in.encode(), SortField.PUBLISHED_AT, Direction.ASC, FP);
 
             assertThat(out).contains(in);
         }
@@ -116,7 +140,7 @@ class CursorTest {
         @Test
         void encodedFormIsUrlSafeBase64WithoutPadding() {
             String encoded =
-                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, "test", 1L)
+                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, FP, "test", 1L)
                             .encode();
 
             assertThat(encoded).doesNotContain("=").doesNotContain("+").doesNotContain("/");
@@ -125,14 +149,14 @@ class CursorTest {
         @Test
         void wireFormatIsStable() {
             String encoded =
-                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, "Dune", 42L)
+                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, FP, "Dune", 42L)
                             .encode();
 
             String json = new String(Base64.getUrlDecoder().decode(encoded));
 
             assertThat(json)
                     .isEqualTo(
-                            "{\"v\":1,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"Dune\",\"id\":42}");
+                            "{\"v\":2,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"Dune\",\"id\":42}");
         }
 
         @Test
@@ -142,6 +166,7 @@ class CursorTest {
                                     SortField.PRICE,
                                     Direction.ASC,
                                     Navigation.NEXT,
+                                    FP,
                                     new BigDecimal("10.50"),
                                     42L)
                             .encode();
@@ -150,7 +175,7 @@ class CursorTest {
 
             assertThat(json)
                     .isEqualTo(
-                            "{\"v\":1,\"sort\":\"price\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":10.50,\"id\":42}");
+                            "{\"v\":2,\"sort\":\"price\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":10.50,\"id\":42}");
         }
 
         @Test
@@ -160,6 +185,7 @@ class CursorTest {
                                     SortField.PUBLISHED_AT,
                                     Direction.ASC,
                                     Navigation.NEXT,
+                                    FP,
                                     LocalDate.of(2024, 5, 17),
                                     42L)
                             .encode();
@@ -168,7 +194,7 @@ class CursorTest {
 
             assertThat(json)
                     .isEqualTo(
-                            "{\"v\":1,\"sort\":\"publishedAt\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"2024-05-17\",\"id\":42}");
+                            "{\"v\":2,\"sort\":\"publishedAt\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"2024-05-17\",\"id\":42}");
         }
     }
 
@@ -177,20 +203,21 @@ class CursorTest {
 
         @Test
         void returnsEmptyForNullInput() {
-            assertThat(Cursor.decode(null, SortField.TITLE, Direction.ASC)).isEmpty();
+            assertThat(Cursor.decode(null, SortField.TITLE, Direction.ASC, FP)).isEmpty();
         }
 
         @Test
         void returnsEmptyForBlankInput() {
-            assertThat(Cursor.decode("   ", SortField.TITLE, Direction.ASC)).isEmpty();
+            assertThat(Cursor.decode("   ", SortField.TITLE, Direction.ASC, FP)).isEmpty();
         }
 
         @Test
         void rejectsSortMismatch() {
             String encoded =
-                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, "x", 1L).encode();
+                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, FP, "x", 1L)
+                            .encode();
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.AUTHOR, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.AUTHOR, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("different sort/direction");
         }
@@ -198,24 +225,55 @@ class CursorTest {
         @Test
         void rejectsDirectionMismatch() {
             String encoded =
-                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, "x", 1L).encode();
+                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, FP, "x", 1L)
+                            .encode();
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.DESC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.DESC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("different sort/direction");
         }
 
         @Test
+        void rejectsFilterFingerprintMismatch() {
+            String encoded =
+                    new Cursor(SortField.TITLE, Direction.ASC, Navigation.NEXT, FP, "x", 1L)
+                            .encode();
+
+            assertThatThrownBy(
+                            () ->
+                                    Cursor.decode(
+                                            encoded, SortField.TITLE, Direction.ASC, "other000000"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("different filter set");
+        }
+
+        @Test
+        void rejectsVersionOneCursor() {
+            String encoded =
+                    b64(
+                            "{\"v\":1,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"x\",\"id\":1}");
+
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("version 1");
+        }
+
+        @Test
         void rejectsTamperedBase64() {
             assertThatThrownBy(
-                            () -> Cursor.decode("!!!not-base64!!!", SortField.TITLE, Direction.ASC))
+                            () ->
+                                    Cursor.decode(
+                                            "!!!not-base64!!!", SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
 
         @Test
         void rejectsValidBase64WithGarbageJson() {
-            assertThatThrownBy(() -> Cursor.decode(b64("not json"), SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(
+                            () ->
+                                    Cursor.decode(
+                                            b64("not json"), SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -226,7 +284,7 @@ class CursorTest {
             // check must win over "malformed".
             String encoded = b64("{\"v\":999,\"anchor\":{\"a\":1}}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("version 999");
         }
@@ -235,9 +293,9 @@ class CursorTest {
         void rejectsMissingVersion() {
             String encoded =
                     b64(
-                            "{\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"x\",\"id\":1}");
+                            "{\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"x\",\"id\":1}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -246,9 +304,9 @@ class CursorTest {
         void rejectsNumericValueForStringSort() {
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":42,\"id\":1}");
+                            "{\"v\":2,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":42,\"id\":1}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -257,9 +315,9 @@ class CursorTest {
         void rejectsStringValueForDecimalSort() {
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"price\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"9.99\",\"id\":1}");
+                            "{\"v\":2,\"sort\":\"price\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"9.99\",\"id\":1}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.PRICE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.PRICE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -268,9 +326,10 @@ class CursorTest {
         void rejectsMalformedDate() {
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"publishedAt\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"not-a-date\",\"id\":1}");
+                            "{\"v\":2,\"sort\":\"publishedAt\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"not-a-date\",\"id\":1}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.PUBLISHED_AT, Direction.ASC))
+            assertThatThrownBy(
+                            () -> Cursor.decode(encoded, SortField.PUBLISHED_AT, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -279,9 +338,9 @@ class CursorTest {
         void rejectsUnknownSortOrNavigationName() {
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"isbn\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"x\",\"id\":1}");
+                            "{\"v\":2,\"sort\":\"isbn\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"x\",\"id\":1}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -290,9 +349,9 @@ class CursorTest {
         void rejectsMissingId() {
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"x\"}");
+                            "{\"v\":2,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"x\"}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }
@@ -304,9 +363,9 @@ class CursorTest {
             // the canConvertToLong() guard in requireLong.
             String encoded =
                     b64(
-                            "{\"v\":1,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"value\":\"x\",\"id\":99999999999999999999999}");
+                            "{\"v\":2,\"sort\":\"title\",\"direction\":\"asc\",\"navigation\":\"NEXT\",\"filters\":\"fp000000000\",\"value\":\"x\",\"id\":99999999999999999999999}");
 
-            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC))
+            assertThatThrownBy(() -> Cursor.decode(encoded, SortField.TITLE, Direction.ASC, FP))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("malformed");
         }

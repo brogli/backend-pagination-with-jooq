@@ -29,10 +29,13 @@ public class BookService {
             return new BookPage(rows);
         }
 
+        String filters = query.filters().fingerprint();
         Cursor next =
-                Cursor.fromRow(rows.getLast(), query.sort(), query.direction(), Navigation.NEXT);
+                Cursor.fromRow(
+                        rows.getLast(), query.sort(), query.direction(), filters, Navigation.NEXT);
         Cursor prev =
-                Cursor.fromRow(rows.getFirst(), query.sort(), query.direction(), Navigation.PREV);
+                Cursor.fromRow(
+                        rows.getFirst(), query.sort(), query.direction(), filters, Navigation.PREV);
         return switch (navigation) {
             case NEXT ->
                     new BookPage(rows)

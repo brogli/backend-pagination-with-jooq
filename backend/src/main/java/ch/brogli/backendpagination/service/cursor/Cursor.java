@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
@@ -20,12 +21,17 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Opaque pagination cursor. Wire format is a base64url (no padding) JSON object:
  *
- * <pre>{"v":1,"sort":"title","direction":"asc","navigation":"NEXT","value":"Dune","id":42}</pre>
+ * <pre>
+ * {"v":2,"sort":"title","direction":"asc","navigation":"NEXT","filters":"Qm9va3MhISE","value":"Dune","id":42}
+ * </pre>
  *
  * <p>{@code value} is the sort-column value of the anchor row and {@code id} the tiebreaker. The
  * runtime type of {@code value} is fixed by {@code sort}: {@link String} for title and author,
  * {@link BigDecimal} for price and rating, {@link LocalDate} for publishedAt. The compact
  * constructor enforces that pairing.
+ *
+ * <p>{@code filters} is a fingerprint of the filter parameters the cursor was issued under, so a
+ * cursor cannot be replayed against a different filter set.
  *
  * <p>{@link Navigation#NEXT} cursors anchor the last row of the current page, {@link
  * Navigation#PREV} cursors anchor the first.
@@ -33,9 +39,14 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>All decode failures throw {@link IllegalArgumentException}. The controller maps that to a 400.
  */
 public record Cursor(
-        SortField sort, Direction direction, Navigation navigation, Object value, long id) {
+        SortField sort,
+        Direction direction,
+        Navigation navigation,
+        String filters,
+        Object value,
+        long id) {
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     private static final ObjectMapper MAPPER =
             JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
@@ -43,6 +54,7 @@ public record Cursor(
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
     public Cursor {
+        Objects.requireNonNull(filters, "filters fingerprint");
         Class<?> expected = valueTypeFor(sort);
         if (!expected.isInstance(value)) {
             throw new IllegalArgumentException(
@@ -52,7 +64,11 @@ public record Cursor(
 
     /** Anchors {@code row} for the given sort and navigation. */
     public static Cursor fromRow(
-            BookDto row, SortField sort, Direction direction, Navigation navigation) {
+            BookDto row,
+            SortField sort,
+            Direction direction,
+            String filters,
+            Navigation navigation) {
         Object value =
                 switch (sort) {
                     case TITLE -> row.getTitle();
@@ -61,7 +77,7 @@ public record Cursor(
                     case RATING -> row.getRating();
                     case PUBLISHED_AT -> row.getPublishedAt();
                 };
-        return new Cursor(sort, direction, navigation, value, row.getId());
+        return new Cursor(sort, direction, navigation, filters, value, row.getId());
     }
 
     public String encode() {
@@ -70,6 +86,7 @@ public record Cursor(
         node.put("sort", sort.getValue());
         node.put("direction", direction.getValue());
         node.put("navigation", navigation.name());
+        node.put("filters", filters);
         node.putPOJO("value", value);
         node.put("id", id);
         return ENCODER.encodeToString(MAPPER.writeValueAsBytes(node));
@@ -77,10 +94,14 @@ public record Cursor(
 
     /**
      * Returns empty if {@code encoded} is null or blank. Throws {@link IllegalArgumentException} on
-     * malformed input, unsupported version, or sort/direction mismatch.
+     * malformed input, unsupported version, sort/direction mismatch, or filter fingerprint
+     * mismatch.
      */
     public static Optional<Cursor> decode(
-            @Nullable String encoded, SortField expectedSort, Direction expectedDirection) {
+            @Nullable String encoded,
+            SortField expectedSort,
+            Direction expectedDirection,
+            String expectedFilters) {
         if (encoded == null || encoded.isBlank()) {
             return Optional.empty();
         }
@@ -95,9 +116,13 @@ public record Cursor(
         if (sort != expectedSort || direction != expectedDirection) {
             throw new IllegalArgumentException("cursor is for a different sort/direction");
         }
+        String filters = requireText(node, "filters");
+        if (!filters.equals(expectedFilters)) {
+            throw new IllegalArgumentException("cursor is for a different filter set");
+        }
         Object value = parseValue(node.path("value"), sort);
         long id = requireLong(node, "id");
-        return Optional.of(new Cursor(sort, direction, navigation, value, id));
+        return Optional.of(new Cursor(sort, direction, navigation, filters, value, id));
     }
 
     private static Class<?> valueTypeFor(SortField sort) {
