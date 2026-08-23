@@ -110,13 +110,17 @@ export function useBooks() {
     loading.value = true
     error.value = null
 
+    // Captured before the request so recovery below is judged against what this request
+    // actually sent, not whatever `cursor.value` has drifted to by the time the response lands.
+    const sentCursor = cursor.value
+
     try {
       const response = await searchBooks({
         query: {
           sort: sort.value,
           dir: dir.value,
           size: size.value,
-          cursor: cursor.value ?? undefined,
+          cursor: sentCursor ?? undefined,
           genre: filters.genre.value.length > 0 ? filters.genre.value : undefined,
           language: filters.language.value ?? undefined,
           inStock: filters.inStock.value ?? undefined,
@@ -128,12 +132,27 @@ export function useBooks() {
         signal: controller.signal,
       })
       if (controller.signal.aborted) return
+      // `cursor.value` can move on before this response lands (e.g. the user paged again
+      // while this request was in flight, ahead of the abort actually landing). Only treat
+      // the cursor as stale if it's still the one this response answers, so an outdated
+      // response never clobbers a newer cursor.
+      const staleCursor = sentCursor !== null && cursor.value === sentCursor
       if (response.error) {
+        if (staleCursor && response.response.status === 400) {
+          console.error('searchBooks returned error, dropping cursor', response.error)
+          dropCursor()
+          return
+        }
         console.error('searchBooks returned error', response.error)
         error.value = 'Failed to load books.'
         return
       }
-      rows.value = response.data?.content ?? []
+      const content = response.data?.content ?? []
+      if (staleCursor && content.length === 0) {
+        dropCursor()
+        return
+      }
+      rows.value = content
       nextCursor.value = response.data?.nextCursor ?? null
       prevCursor.value = response.data?.prevCursor ?? null
     } catch (cause) {
@@ -177,6 +196,15 @@ export function useBooks() {
         cursor: value,
       },
     })
+  }
+
+  // A cursor the server rejects (400) or that lands on an empty page is stale: rows were
+  // deleted, filters changed out of band, or the cursor format moved on. Clearing it (same
+  // idiom as the sort/filter watcher above) lets the route watcher reload page 1 with the same
+  // sort and filters. `useRouteQuery`'s default replace mode keeps the broken URL out of
+  // history.
+  function dropCursor(): void {
+    cursor.value = null
   }
 
   function goNext(): void {
