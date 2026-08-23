@@ -48,9 +48,7 @@ public class BookController implements BooksApi {
 
         SearchBooksQuery query =
                 new SearchBooksQuery(
-                        new SearchBooksQuery.Paging(sort, direction, size),
-                        decodeCursor(cursor, sort, direction),
-                        filters);
+                        sort, direction, size, decodeCursor(cursor, sort, direction), filters);
 
         return ResponseEntity.ok(service.search(query));
     }
