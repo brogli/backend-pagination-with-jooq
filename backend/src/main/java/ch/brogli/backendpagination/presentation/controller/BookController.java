@@ -48,7 +48,11 @@ public class BookController implements BooksApi {
 
         SearchBooksQuery query =
                 new SearchBooksQuery(
-                        sort, direction, size, decodeCursor(cursor, sort, direction), filters);
+                        sort,
+                        direction,
+                        size,
+                        decodeCursor(cursor, sort, direction, filters.fingerprint()),
+                        filters);
 
         return ResponseEntity.ok(service.search(query));
     }
@@ -62,9 +66,9 @@ public class BookController implements BooksApi {
     }
 
     private static @Nullable Cursor decodeCursor(
-            @Nullable String cursor, SortField sort, Direction direction) {
+            @Nullable String cursor, SortField sort, Direction direction, String filters) {
         try {
-            return Cursor.decode(cursor, sort, direction).orElse(null);
+            return Cursor.decode(cursor, sort, direction, filters).orElse(null);
         } catch (IllegalArgumentException e) {
             throw new BadRequestException(e.getMessage());
         }
