@@ -8,14 +8,17 @@ import ch.brogli.backendpagination.api.model.Genre;
 import ch.brogli.backendpagination.api.model.Language;
 import ch.brogli.backendpagination.api.model.SortField;
 import ch.brogli.backendpagination.jooq.tables.records.BookRecord;
+import ch.brogli.backendpagination.service.SearchBooksQuery.Filters;
+import ch.brogli.backendpagination.service.cursor.Cursor;
 import ch.brogli.backendpagination.service.cursor.Navigation;
 import java.util.List;
-import java.util.Optional;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectSeekStepN;
 import org.jooq.TableField;
+import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -26,41 +29,75 @@ public class BookRepository {
         this.dsl = dsl;
     }
 
-    public record Anchor(Object value, long id) {}
-
     public record PageResult(List<BookDto> rows, boolean hasMore) {}
 
     /**
-     * Single seek in the direction implied by {@code navigation}. {@link Navigation#PREV} reverses
-     * ORDER BY internally and re-reverses the trimmed result to forward order before returning.
+     * Single seek in the direction implied by {@code cursor}'s navigation ({@link Navigation#NEXT}
+     * when {@code cursor} is null). {@link Navigation#PREV} reverses ORDER BY internally and
+     * re-reverses the trimmed result to forward order before returning. Fetches {@code size + 1}
+     * rows so {@code hasMore} needs no COUNT.
      */
     public PageResult fetchPage(
             SortField sort,
             Direction direction,
-            Navigation navigation,
             int size,
-            Optional<Anchor> anchor,
-            Condition where) {
+            @Nullable Cursor cursor,
+            Filters filters) {
+        Navigation navigation = cursor == null ? Navigation.NEXT : cursor.navigation();
         TableField<BookRecord, ?> sortField = fieldFor(sort);
         boolean sortAsc = direction == Direction.ASC;
         boolean orderAsc = sortAsc == (navigation == Navigation.NEXT);
 
         SelectSeekStepN<BookRecord> step =
                 dsl.selectFrom(BOOK)
-                        .where(where)
+                        .where(conditionsFor(filters))
                         .orderBy(
                                 orderAsc ? sortField.asc() : sortField.desc(),
                                 orderAsc ? BOOK.ID.asc() : BOOK.ID.desc());
 
-        var limited =
-                anchor.map(a -> step.seek(a.value(), a.id()).limit(size + 1))
-                        .orElseGet(() -> step.limit(size + 1));
-        List<BookDto> fetched = limited.fetch().map(BookRepository::toDto);
+        List<BookDto> fetched;
+        if (cursor == null) {
+            fetched = step.limit(size + 1).fetch().map(BookRepository::toDto);
+        } else {
+            fetched =
+                    step.seek(cursor.value(), cursor.id())
+                            .limit(size + 1)
+                            .fetch()
+                            .map(BookRepository::toDto);
+        }
 
         boolean hasMore = fetched.size() > size;
         List<BookDto> trimmed = hasMore ? fetched.subList(0, size) : fetched;
         List<BookDto> ordered = navigation == Navigation.PREV ? trimmed.reversed() : trimmed;
         return new PageResult(ordered, hasMore);
+    }
+
+    private static Condition conditionsFor(Filters filters) {
+        Condition where = DSL.noCondition();
+        if (filters.genre() != null && !filters.genre().isEmpty()) {
+            where =
+                    where.and(
+                            BOOK.GENRE.in(filters.genre().stream().map(Genre::getValue).toList()));
+        }
+        if (filters.language() != null) {
+            where = where.and(BOOK.LANGUAGE.eq(filters.language().getValue()));
+        }
+        if (filters.inStock() != null) {
+            where = where.and(BOOK.IN_STOCK.eq(filters.inStock()));
+        }
+        if (filters.minRating() != null) {
+            where = where.and(BOOK.RATING.ge(filters.minRating()));
+        }
+        if (filters.priceMin() != null) {
+            where = where.and(BOOK.PRICE.ge(filters.priceMin()));
+        }
+        if (filters.priceMax() != null) {
+            where = where.and(BOOK.PRICE.le(filters.priceMax()));
+        }
+        if (filters.publishedAfter() != null) {
+            where = where.and(BOOK.PUBLISHED_AT.ge(filters.publishedAfter()));
+        }
+        return where;
     }
 
     private static TableField<BookRecord, ?> fieldFor(SortField sort) {

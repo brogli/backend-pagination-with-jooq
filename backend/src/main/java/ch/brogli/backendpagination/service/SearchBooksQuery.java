@@ -10,9 +10,8 @@ import java.time.LocalDate;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-public record SearchBooksQuery(Paging paging, @Nullable Cursor cursor, Filters filters) {
-
-    public record Paging(SortField sort, Direction direction, int size) {}
+public record SearchBooksQuery(
+        SortField sort, Direction direction, int size, @Nullable Cursor cursor, Filters filters) {
 
     public record Filters(
             @Nullable List<Genre> genre,
