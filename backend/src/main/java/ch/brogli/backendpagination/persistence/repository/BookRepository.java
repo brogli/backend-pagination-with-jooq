@@ -9,7 +9,6 @@ import ch.brogli.backendpagination.api.model.Language;
 import ch.brogli.backendpagination.api.model.SortField;
 import ch.brogli.backendpagination.jooq.tables.records.BookRecord;
 import ch.brogli.backendpagination.service.cursor.Navigation;
-import ch.brogli.backendpagination.service.cursor.SortValue;
 import java.util.List;
 import java.util.Optional;
 import org.jooq.Condition;
@@ -27,7 +26,7 @@ public class BookRepository {
         this.dsl = dsl;
     }
 
-    public record Anchor(SortValue value, long id) {}
+    public record Anchor(Object value, long id) {}
 
     public record PageResult(List<BookDto> rows, boolean hasMore) {}
 
@@ -54,7 +53,7 @@ public class BookRepository {
                                 orderAsc ? BOOK.ID.asc() : BOOK.ID.desc());
 
         var limited =
-                anchor.map(a -> step.seek(a.value().unwrap(), a.id()).limit(size + 1))
+                anchor.map(a -> step.seek(a.value(), a.id()).limit(size + 1))
                         .orElseGet(() -> step.limit(size + 1));
         List<BookDto> fetched = limited.fetch().map(BookRepository::toDto);
 
