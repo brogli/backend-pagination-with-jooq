@@ -107,6 +107,24 @@ class BookControllerPaginationIT {
     }
 
     @Test
+    void prevWithGenreFilter_reversesCorrectly() throws Exception {
+        // Same shape as nextThenPrev_returnsFirstPageInForwardOrder_withoutPrevCursor, but with a
+        // genre filter applied throughout: the filter fingerprint and the reverse seek both ride
+        // along on the same cursor, so PREV must still land back on page 1 correctly.
+        seedRowsTitleOrderedByIndex(30);
+
+        String page1 = body(fetchPage("asc", 10, null, "Fantasy"));
+        String page2 = body(fetchPage("asc", 10, readNextCursor(page1), "Fantasy"));
+
+        fetchPage("asc", 10, readPrevCursor(page2), "Fantasy")
+                .andExpect(jsonPath("$.content", Matchers.hasSize(10)))
+                .andExpect(jsonPath("$.content[0].title").value("T001"))
+                .andExpect(jsonPath("$.content[9].title").value("T010"))
+                .andExpect(jsonPath("$.prevCursor").doesNotExist())
+                .andExpect(jsonPath("$.nextCursor").isString());
+    }
+
+    @Test
     void nextThenPrev_returnsFirstPageInForwardOrder_withoutPrevCursor() throws Exception {
         // Page 1 is T001..T010. Walking NEXT then PREV must land on exactly page 1 again, rows
         // in forward order (the PREV seek runs reversed and is re-reversed before returning),
