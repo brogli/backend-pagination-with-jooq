@@ -8,9 +8,9 @@
 
 ## Pinned versions
 
-- Spring Boot **4.0.6** (Groovy DSL, `build.gradle`)
-- Gradle wrapper **9.4.1**, Java **25** (Temurin via sdkman; `sdk use java 25.0.3-tem` first)
-- Liquibase **5.0.2**, jOOQ **3.19.32**, Postgres JDBC **42.7.10**, Testcontainers **1.21.3**
+- Spring Boot **4.1.0** (Groovy DSL, `build.gradle`)
+- Gradle wrapper **9.6.1**, Java **25** (Temurin via sdkman; `sdk use java 25.0.3-tem` first)
+- Liquibase **5.0.3**, jOOQ **3.21.6**, Postgres JDBC **42.7.13**, Testcontainers **1.21.4**
 - `org.openapi.generator` plugin **7.22.0+**
 - jOOQ codegen and runtime versions **must match** — newer codegen emits symbols missing in older
   runtime.
@@ -28,6 +28,9 @@
   `'!seed-large'`. To exclude multiple contexts use a single AND expression
   (`'!seed-large and !seed-medium'`); comma is OR in Liquibase 5 and `'!a,!b'` accepts changesets
   tagged `a` because they satisfy `!b`.
+- Cursor fingerprint canonical string must use the OpenAPI enum `getValue()` strings, never enum
+  `hashCode()` (identity-based, differs per JVM). Changing the fingerprint input or the cursor
+  wire shape requires bumping `Cursor.CURRENT_VERSION`.
 
 ## Boot 4 surprises
 
@@ -64,6 +67,9 @@
   `type: [string, "null"]`. `items: true` for "any"-typed arrays.
 - `prev` reverse seek uses `limit = size + 1` — forward `.seek()` is strictly greater-than, so the
   prior seed is `size` rows further back than the current first row.
+- Binding/type-mismatch 400s come from `spring.mvc.problemdetails.enabled`. Only two custom
+  handlers: `BadRequestException` and `ConstraintViolationException` (generated `BooksApi` is
+  `@Validated`, bean-validation failures bypass problem details).
 
 ## Frontend (`:frontend`)
 

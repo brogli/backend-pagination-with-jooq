@@ -6,7 +6,7 @@ Keyset pagination on `/api/books`. The API contract lives in
 ## Request and response
 
 A request carries a sort field, a direction, a size, an optional cursor, and zero or more filters.
-The response is `{ items, prevCursor, nextCursor }`. Each cursor is either a string the client
+The response is `{ content, prevCursor, nextCursor }`. Each cursor is either a string the client
 passes back as-is on the next request, or null when there's nothing more in that direction. One page
 costs one query. No count, no extra round trip.
 
@@ -25,50 +25,58 @@ plans for every sort/filter combination the API supports.
 The `id` is in the anchor as a tiebreaker. Sort columns aren't unique. Two books can share a title,
 a price, or a publication date, so the anchor needs both pieces to point at one specific row.
 
-## The seek in jOOQ
+## The seek
 
-The same query shape runs for every page. jOOQ's `.seek()` produces a row tuple comparison against
-the `ORDER BY` columns:
+The same query shape runs for every page:
 
-```java
-var step = dsl.selectFrom(BOOK)
-        .where(where)
-        .orderBy(sortField.asc(), BOOK.ID.asc());
-
-// First page (no anchor).
-step.limit(size + 1);
-
-// Subsequent page (seek past the anchor).
-step.seek(anchor.value().unwrap(), anchor.id()).limit(size + 1);
+```sql
+SELECT ... FROM book
+WHERE <filters>
+  AND (sort_col, id) > (:anchor_value, :anchor_id)   -- omitted on the first page
+ORDER BY sort_col, id
+LIMIT :size + 1
 ```
 
-`.seek(v, id)` becomes `WHERE (sort_col, id) > (?, ?)` in SQL. That row tuple form is what lets
-Postgres use the composite `(sort_col, id)` index as an Index Only Scan. The strict `>` (not `>=`)
-excludes the anchor row from the next page, since the client already has it.
+The row tuple comparison is what lets Postgres use the composite `(sort_col, id)` index as an Index
+Only Scan. The strict `>` (not `>=`) excludes the anchor row from the next page, since the client
+already has it. For descending sorts and for backward navigation the comparison and the ordering
+flip together.
 
-The first page has no anchor and so skips `.seek()` entirely. Every page after that gets its anchor
-from the previous response, carried in a cursor.
+The first page has no anchor and so skips the comparison entirely. Every page after that gets its
+anchor from the previous response, carried in a cursor.
 
 ## The cursor
 
 A cursor is a base64url-encoded (no padding) JSON envelope:
 
 ```json
-{ "v": 1, "sort": "title", "direction": "asc", "navigation": "NEXT", "value": "Dune", "id": 42 }
+{
+  "v": 2,
+  "sort": "title",
+  "direction": "asc",
+  "navigation": "NEXT",
+  "filters": "Qm9va3MhISE",
+  "value": "Dune",
+  "id": 42
+}
 ```
 
 - `value` and `id` are the anchor that feeds the next seek.
 - `sort` and `direction` are bound to the query the cursor was issued under. Reusing a cursor with a
   different sort or direction returns 400.
+- `filters` is a short fingerprint of the filter parameters the cursor was issued under. Reusing a
+  cursor with a different filter set returns 400. See
+  [Filters and cursor validity](#filters-and-cursor-validity).
 - `navigation` says whether the next seek runs forward (`NEXT`) or backward (`PREV`). See
   [Bidirectional navigation](#bidirectional-navigation).
-- `v` is a format version, so the encoding can change later without breaking cursors that are still
-  in flight.
+- `v` is a format version. It is checked before anything else in the envelope, so a cursor from a
+  newer or older format is reported as unsupported rather than malformed.
 
 The cursor is opaque. Clients pass it back as-is and don't parse or modify it.
 
-The decoder is typed by sort field. A `value` of the wrong shape is rejected at decode rather than
-ever reaching the seek.
+The type of `value` follows the sort field: a string for title and author, a decimal for price and
+rating, an ISO date for the publication date. A value of the wrong shape is rejected when the cursor
+is decoded, before it can reach the database.
 
 ## Edge detection
 
@@ -95,10 +103,25 @@ ordering flips.
 
 ## Filters and cursor validity
 
-The cursor binds sort and direction (a mismatch returns 400), but it doesn't bind the filter
-parameters (`genre`, `language`, `inStock`, `minRating`, `priceMin`, `priceMax`, `publishedAfter`).
-Filters are kept off the cursor for simplicity. The client is expected to drop the cursor whenever
-filters change, and the frontend does this.
+An anchor only makes sense inside the result set it was taken from. A cursor issued under
+`genre=Fantasy` points at a row that may not exist in the `genre=SciFi` result set, and seeking from
+it would start the page at an arbitrary position.
+
+The cursor therefore carries a fingerprint of the filter parameters: a short hash of their canonical
+values (genres de-duplicated and sorted, numbers normalised). The server recomputes the fingerprint
+from the incoming request and rejects the cursor with 400 if it differs. The filter values
+themselves stay out of the cursor, which keeps it short and avoids duplicating state that already
+lives in the query string.
+
+The frontend drops the cursor whenever a filter, sort or page size changes, so the 400 only fires for
+hand-edited or stale URLs.
+
+## Stale cursors
+
+A bookmarked cursor can go stale: the rows around the anchor were deleted, or the cursor format was
+versioned. The server answers with 400 (rejected cursor) or an empty page (anchor past the end of
+the data in that direction). In both cases the client drops the cursor and reloads the first page
+with the same sort and filters. The retry carries no cursor, so it cannot loop.
 
 ## See also
 
