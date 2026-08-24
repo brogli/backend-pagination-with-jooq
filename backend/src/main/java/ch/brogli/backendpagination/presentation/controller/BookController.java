@@ -48,8 +48,10 @@ public class BookController implements BooksApi {
 
         SearchBooksQuery query =
                 new SearchBooksQuery(
-                        new SearchBooksQuery.Paging(sort, direction, size),
-                        Cursor.decode(cursor, sort, direction).orElse(null),
+                        sort,
+                        direction,
+                        size,
+                        decodeCursor(cursor, sort, direction, filters.fingerprint()),
                         filters);
 
         return ResponseEntity.ok(service.search(query));
@@ -60,6 +62,15 @@ public class BookController implements BooksApi {
         if (priceMin != null && priceMax != null && priceMin.compareTo(priceMax) > 0) {
             throw new BadRequestException(
                     "priceMin (" + priceMin + ") must be <= priceMax (" + priceMax + ")");
+        }
+    }
+
+    private static @Nullable Cursor decodeCursor(
+            @Nullable String cursor, SortField sort, Direction direction, String filters) {
+        try {
+            return Cursor.decode(cursor, sort, direction, filters).orElse(null);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException(e.getMessage());
         }
     }
 }

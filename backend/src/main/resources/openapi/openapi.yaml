@@ -10,7 +10,7 @@ info:
     passes back verbatim as `?cursor=...` to fetch the adjacent page.
     Cursor opacity: clients must not parse, decode, or modify the string —
     its internal shape is versioned and may change without notice.
-    Switching `sort` or `dir` while reusing a cursor returns 400.
+    Reusing a cursor with a different `sort`, `dir` or filter set returns 400.
 
 paths:
   /api/books:
@@ -43,8 +43,8 @@ paths:
           description: |
             Opaque pagination cursor. Pass back the `nextCursor` /
             `prevCursor` returned by the prior response verbatim. Must be
-            paired with the same `sort` and `dir` it was issued under —
-            mismatches return 400. Omit for the first page.
+            paired with the same `sort`, `dir` and filter parameters it was
+            issued under. Mismatches return 400. Omit for the first page.
           schema:
             type: string
         - name: genre

@@ -1,226 +1,203 @@
 package ch.brogli.backendpagination.service.cursor;
 
+import ch.brogli.backendpagination.api.model.BookDto;
 import ch.brogli.backendpagination.api.model.Direction;
 import ch.brogli.backendpagination.api.model.SortField;
-import ch.brogli.backendpagination.presentation.exception.BadRequestException;
-import ch.brogli.backendpagination.service.cursor.SortValue.DateValue;
-import ch.brogli.backendpagination.service.cursor.SortValue.DecimalValue;
-import ch.brogli.backendpagination.service.cursor.SortValue.StringValue;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JavaType;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.cfg.CoercionAction;
-import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Opaque pagination cursor. Wire format: base64url-without-padding JSON envelope carrying version,
- * sort, direction, navigation hint, anchor sort value, and tiebreaker id.
+ * Opaque pagination cursor. Wire format is a base64url (no padding) JSON object:
  *
- * <p>{@link Navigation#NEXT} cursors anchor the last row of the current page; {@link
+ * <pre>
+ * {"v":2,"sort":"title","direction":"asc","navigation":"NEXT","filters":"Qm9va3MhISE","value":"Dune","id":42}
+ * </pre>
+ *
+ * <p>{@code value} is the sort-column value of the anchor row and {@code id} the tiebreaker. The
+ * runtime type of {@code value} is fixed by {@code sort}: {@link String} for title and author,
+ * {@link BigDecimal} for price and rating, {@link LocalDate} for publishedAt. The compact
+ * constructor enforces that pairing.
+ *
+ * <p>{@code filters} is a fingerprint of the filter parameters the cursor was issued under, so a
+ * cursor cannot be replayed against a different filter set.
+ *
+ * <p>{@link Navigation#NEXT} cursors anchor the last row of the current page, {@link
  * Navigation#PREV} cursors anchor the first.
+ *
+ * <p>All decode failures throw {@link IllegalArgumentException}. The controller maps that to a 400.
  */
-public sealed interface Cursor {
+public record Cursor(
+        SortField sort,
+        Direction direction,
+        Navigation navigation,
+        String filters,
+        Object value,
+        long id) {
 
-    int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
-    SortField sort();
+    private static final ObjectMapper MAPPER =
+            JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
+    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
+    private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
-    Direction direction();
-
-    Navigation navigation();
-
-    SortValue value();
-
-    long id();
-
-    String encode();
-
-    record StringCursor(
-            SortField sort, Direction direction, Navigation navigation, StringValue value, long id)
-            implements Cursor {
-        public StringCursor {
-            requireSortMatchesValueType(sort, SortField.TITLE, SortField.AUTHOR);
-        }
-
-        @Override
-        public String encode() {
-            return Codec.encode(
-                    new Envelope<>(
-                            CURRENT_VERSION, sort, direction, navigation, value.value(), id));
+    public Cursor {
+        Objects.requireNonNull(filters, "filters fingerprint");
+        Class<?> expected = valueTypeFor(sort);
+        if (!expected.isInstance(value)) {
+            throw new IllegalArgumentException(
+                    "sort " + sort + " needs a " + expected.getSimpleName() + " value");
         }
     }
 
-    record DecimalCursor(
-            SortField sort, Direction direction, Navigation navigation, DecimalValue value, long id)
-            implements Cursor {
-        public DecimalCursor {
-            requireSortMatchesValueType(sort, SortField.PRICE, SortField.RATING);
-        }
-
-        @Override
-        public String encode() {
-            return Codec.encode(
-                    new Envelope<>(
-                            CURRENT_VERSION, sort, direction, navigation, value.value(), id));
-        }
+    /** Anchors {@code row} for the given sort and navigation. */
+    public static Cursor fromRow(
+            BookDto row,
+            SortField sort,
+            Direction direction,
+            String filters,
+            Navigation navigation) {
+        Object value =
+                switch (sort) {
+                    case TITLE -> row.getTitle();
+                    case AUTHOR -> row.getAuthor();
+                    case PRICE -> row.getPrice();
+                    case RATING -> row.getRating();
+                    case PUBLISHED_AT -> row.getPublishedAt();
+                };
+        return new Cursor(sort, direction, navigation, filters, value, row.getId());
     }
 
-    record DateCursor(
-            SortField sort, Direction direction, Navigation navigation, DateValue value, long id)
-            implements Cursor {
-        public DateCursor {
-            requireSortMatchesValueType(sort, SortField.PUBLISHED_AT);
-        }
-
-        @Override
-        public String encode() {
-            return Codec.encode(
-                    new Envelope<>(
-                            CURRENT_VERSION, sort, direction, navigation, value.value(), id));
-        }
-    }
-
-    /** Builds the variant matching {@code value}'s type. */
-    static Cursor of(
-            SortField sort, Direction direction, Navigation navigation, SortValue value, long id) {
-        return switch (value) {
-            case StringValue s -> new StringCursor(sort, direction, navigation, s, id);
-            case DecimalValue d -> new DecimalCursor(sort, direction, navigation, d, id);
-            case DateValue d -> new DateCursor(sort, direction, navigation, d, id);
-        };
+    public String encode() {
+        ObjectNode node = MAPPER.createObjectNode();
+        node.put("v", CURRENT_VERSION);
+        node.put("sort", sort.getValue());
+        node.put("direction", direction.getValue());
+        node.put("navigation", navigation.name());
+        node.put("filters", filters);
+        node.putPOJO("value", value);
+        node.put("id", id);
+        return ENCODER.encodeToString(MAPPER.writeValueAsBytes(node));
     }
 
     /**
-     * Returns empty if {@code encoded} is null/blank. Throws {@link BadRequestException} on
-     * malformed base64/JSON, unknown version, or sort/direction mismatch.
+     * Returns empty if {@code encoded} is null or blank. Throws {@link IllegalArgumentException} on
+     * malformed input, unsupported version, sort/direction mismatch, or filter fingerprint
+     * mismatch.
      */
-    static Optional<Cursor> decode(
-            @Nullable String encoded, SortField expectedSort, Direction expectedDirection) {
+    public static Optional<Cursor> decode(
+            @Nullable String encoded,
+            SortField expectedSort,
+            Direction expectedDirection,
+            String expectedFilters) {
         if (encoded == null || encoded.isBlank()) {
             return Optional.empty();
         }
-        Cursor decoded = Codec.decode(encoded, expectedSort);
-        if (decoded.sort() != expectedSort || decoded.direction() != expectedDirection) {
-            throw new BadRequestException("cursor is for a different sort/direction");
+        JsonNode node = readTree(encoded);
+        long version = requireLong(node, "v");
+        if (version != CURRENT_VERSION) {
+            throw new IllegalArgumentException("cursor version " + version + " is not supported");
         }
-        return Optional.of(decoded);
+        SortField sort = parseEnum(requireText(node, "sort"), SortField::fromValue);
+        Direction direction = parseEnum(requireText(node, "direction"), Direction::fromValue);
+        Navigation navigation = parseEnum(requireText(node, "navigation"), Navigation::valueOf);
+        if (sort != expectedSort || direction != expectedDirection) {
+            throw new IllegalArgumentException("cursor is for a different sort/direction");
+        }
+        String filters = requireText(node, "filters");
+        if (!filters.equals(expectedFilters)) {
+            throw new IllegalArgumentException("cursor is for a different filter set");
+        }
+        Object value = parseValue(node.path("value"), sort);
+        long id = requireLong(node, "id");
+        return Optional.of(new Cursor(sort, direction, navigation, filters, value, id));
     }
 
-    private static void requireSortMatchesValueType(SortField sort, SortField... allowed) {
-        for (SortField a : allowed) {
-            if (a == sort) {
-                return;
-            }
-        }
-        throw new IllegalArgumentException("sort " + sort + " does not match this cursor variant");
+    private static Class<?> valueTypeFor(SortField sort) {
+        return switch (sort) {
+            case TITLE, AUTHOR -> String.class;
+            case PRICE, RATING -> BigDecimal.class;
+            case PUBLISHED_AT -> LocalDate.class;
+        };
     }
 
-    /** Wire envelope. Generic so each cursor variant binds Jackson to a statically-typed value. */
-    record Envelope<V>(
-            @JsonProperty("v") int version,
-            @JsonProperty("sort") SortField sort,
-            @JsonProperty("direction") Direction direction,
-            @JsonProperty("navigation") Navigation navigation,
-            @JsonProperty("value") V value,
-            @JsonProperty("id") long id) {}
-
-    final class Codec {
-        private static final ObjectMapper MAPPER =
-                JsonMapper.builder()
-                        .withCoercionConfigDefaults(
-                                cfg -> {
-                                    cfg.setCoercion(
-                                            CoercionInputShape.Integer, CoercionAction.Fail);
-                                    cfg.setCoercion(CoercionInputShape.Float, CoercionAction.Fail);
-                                    cfg.setCoercion(
-                                            CoercionInputShape.Boolean, CoercionAction.Fail);
-                                    cfg.setCoercion(CoercionInputShape.String, CoercionAction.Fail);
-                                })
-                        .build();
-        private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
-        private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
-
-        private Codec() {}
-
-        static <V> String encode(Envelope<V> envelope) {
-            return ENCODER.encodeToString(MAPPER.writeValueAsBytes(envelope));
+    private static JsonNode readTree(String encoded) {
+        JsonNode node;
+        try {
+            node = MAPPER.readTree(DECODER.decode(encoded));
+        } catch (IllegalArgumentException | JacksonException e) {
+            throw malformed();
         }
-
-        static Cursor decode(String encoded, SortField expectedSort) {
-            byte[] json;
-            try {
-                json = DECODER.decode(encoded);
-            } catch (IllegalArgumentException e) {
-                throw new BadRequestException("cursor is malformed");
-            }
-            return switch (expectedSort) {
-                case TITLE, AUTHOR ->
-                        readVariant(
-                                json,
-                                String.class,
-                                (sort, dir, nav, value, id) ->
-                                        new StringCursor(
-                                                sort, dir, nav, new StringValue(value), id));
-                case PRICE, RATING ->
-                        readVariant(
-                                json,
-                                BigDecimal.class,
-                                (sort, dir, nav, value, id) ->
-                                        new DecimalCursor(
-                                                sort, dir, nav, new DecimalValue(value), id));
-                case PUBLISHED_AT ->
-                        readVariant(
-                                json,
-                                LocalDate.class,
-                                (sort, dir, nav, value, id) ->
-                                        new DateCursor(sort, dir, nav, new DateValue(value), id));
-            };
+        if (node == null || !node.isObject()) {
+            throw malformed();
         }
+        return node;
+    }
 
-        private static <V> Cursor readVariant(
-                byte[] json, Class<V> valueType, VariantBuilder<V> builder) {
-            JavaType envelopeType =
-                    MAPPER.getTypeFactory().constructParametricType(Envelope.class, valueType);
-            Envelope<V> envelope;
-            try {
-                envelope = MAPPER.readValue(json, envelopeType);
-            } catch (JacksonException e) {
-                throw new BadRequestException("cursor is malformed");
+    private static Object parseValue(JsonNode valueNode, SortField sort) {
+        return switch (sort) {
+            case TITLE, AUTHOR -> {
+                if (!valueNode.isString()) {
+                    throw malformed();
+                }
+                yield valueNode.asString();
             }
-            if (envelope == null
-                    || envelope.sort() == null
-                    || envelope.direction() == null
-                    || envelope.navigation() == null
-                    || envelope.value() == null) {
-                throw new BadRequestException("cursor is malformed");
+            case PRICE, RATING -> {
+                if (!valueNode.isNumber()) {
+                    throw malformed();
+                }
+                yield valueNode.decimalValue();
             }
-            if (envelope.version() != CURRENT_VERSION) {
-                throw new BadRequestException(
-                        "cursor version " + envelope.version() + " is not supported");
+            case PUBLISHED_AT -> {
+                if (!valueNode.isString()) {
+                    throw malformed();
+                }
+                try {
+                    yield LocalDate.parse(valueNode.asString());
+                } catch (DateTimeParseException e) {
+                    throw malformed();
+                }
             }
-            try {
-                return builder.build(
-                        envelope.sort(),
-                        envelope.direction(),
-                        envelope.navigation(),
-                        envelope.value(),
-                        envelope.id());
-            } catch (IllegalArgumentException e) {
-                throw new BadRequestException("cursor is malformed");
-            }
-        }
+        };
+    }
 
-        @FunctionalInterface
-        private interface VariantBuilder<V> {
-            Cursor build(
-                    SortField sort, Direction direction, Navigation navigation, V value, long id);
+    private static <E> E parseEnum(String text, Function<String, E> parser) {
+        try {
+            return parser.apply(text);
+        } catch (IllegalArgumentException e) {
+            throw malformed();
         }
+    }
+
+    private static String requireText(JsonNode node, String field) {
+        JsonNode child = node.path(field);
+        if (!child.isString()) {
+            throw malformed();
+        }
+        return child.asString();
+    }
+
+    private static long requireLong(JsonNode node, String field) {
+        JsonNode child = node.path(field);
+        if (!child.canConvertToLong()) {
+            throw malformed();
+        }
+        return child.asLong();
+    }
+
+    private static IllegalArgumentException malformed() {
+        return new IllegalArgumentException("cursor is malformed");
     }
 }

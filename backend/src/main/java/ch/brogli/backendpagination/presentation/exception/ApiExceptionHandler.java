@@ -3,14 +3,18 @@ package ch.brogli.backendpagination.presentation.exception;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
-import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.method.annotation.HandlerMethodValidationException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+/**
+ * Binding and type-mismatch failures are turned into RFC 7807 responses by Spring itself (see
+ * {@code spring.mvc.problemdetails.enabled}). The generated {@code BooksApi} is {@code @Validated},
+ * so bean-validation failures on its parameters arrive as {@link ConstraintViolationException}
+ * instead of Spring's own {@code HandlerMethodValidationException} and still need a hand-written
+ * mapping here, alongside {@link BadRequestException}.
+ */
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
@@ -19,39 +23,12 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ProblemDetail typeMismatch(MethodArgumentTypeMismatchException e) {
-        String type = e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "?";
-        String detail =
-                "invalid value for '"
-                        + e.getName()
-                        + "': "
-                        + e.getValue()
-                        + " (expected "
-                        + type
-                        + ")";
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-    }
-
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail constraintViolation(ConstraintViolationException e) {
         String detail =
                 e.getConstraintViolations().stream()
                         .map(this::violationMessage)
                         .collect(Collectors.joining("; "));
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-    }
-
-    @ExceptionHandler(HandlerMethodValidationException.class)
-    public ProblemDetail methodValidation(HandlerMethodValidationException e) {
-        String detail =
-                e.getValueResults().stream()
-                        .flatMap(v -> v.getResolvableErrors().stream())
-                        .map(MessageSourceResolvable::getDefaultMessage)
-                        .collect(Collectors.joining("; "));
-        if (detail.isBlank()) {
-            detail = e.getMessage();
-        }
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
     }
 
