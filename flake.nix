@@ -18,6 +18,15 @@
               treefmt
               nixfmt
             ];
+
+            env = {
+              # Must be the same Playwright version as @playwright/test in frontend/package.json.
+              PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers.override {
+                withFirefox = false;
+                withWebkit = false;
+              };
+              PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+            };
           };
         }
       );

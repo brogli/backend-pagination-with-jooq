@@ -78,11 +78,16 @@
 ## Frontend (`:frontend`)
 
 - Vue 3 + OpenVue (MIT fork of PrimeVue 4.5.5, same API, styled mode) + Tailwind v4 + vue-router,
-  ported from `opinionated-vuejs-starter`. **No Pinia, no Playwright** (vitest stays).
+  ported from `opinionated-vuejs-starter`. **No Pinia.**
 - Don't add `primevue`, `@primeuix/*` or `primeicons` (no longer MIT). Theme base is
   `@openuxkit/themes`. `tailwindcss-primeui` stays (MIT, OpenVue keeps the `p` token prefix).
 - `gradle-node-plugin` runs with `download = false`: Gradle uses the dev shell's Node and pnpm, so
   run `./gradlew` inside the shell.
+- E2E: one Playwright smoke test (`frontend/e2e/`) against the real stack. Playwright starts
+  `:backend:bootTestRun` (built SPA embedded, Postgres testcontainer, `seed-medium`) on :8080 and
+  reuses a server already running there locally. Chromium comes from the dev shell
+  (`playwright-driver.browsers`), so don't run `playwright install`. Its version must equal
+  `@playwright/test`: bump both in one change.
 - Hey API codegen: `openapi-ts.config.ts` reads
   `../backend/src/main/resources/openapi/openapi.yaml`. Output `frontend/src/api/generated/` is
   gitignored. Runs as `predev` / `prebuild`.
@@ -162,6 +167,7 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun      # dev + 1M-row seed
 ./gradlew :frontend:pnpmDev                                  # vite dev server on :5173
 ./gradlew :frontend:pnpmGenApi                               # regenerate Hey API client
 ./gradlew :frontend:assemble                                 # type-check + vite build → dist/
+(cd frontend && pnpm test:e2e)                               # Playwright smoke test, boots the stack
 
 treefmt                                                      # lint fixes + format (frontend, md, nix)
 ```

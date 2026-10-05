@@ -25,6 +25,11 @@
       "automerge": true
     },
     {
+      "description": "The browsers come from nixpkgs' playwright-driver (flake.nix) and must be the same Playwright version, so bump @playwright/test manually together with flake.lock.",
+      "matchPackageNames": ["@playwright/test"],
+      "automerge": false
+    },
+    {
       "description": "Exclude pre-1.0.0 versions from auto-merge (0.x minor bumps can be breaking by semver convention). Must come last so it overrides the rule above.",
       "matchUpdateTypes": ["minor", "patch"],
       "matchCurrentVersion": "/^0\\./",
