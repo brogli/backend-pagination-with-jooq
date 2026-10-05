@@ -1,5 +1,5 @@
 // jsdom doesn't ship matchMedia / ResizeObserver / IntersectionObserver, but
-// PrimeVue's Select / DataTable / etc. call them on mount. Stub the minimal
+// OpenVue's Select / DataTable / etc. call them on mount. Stub the minimal
 // surface so component tests can mount without a real browser.
 
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {

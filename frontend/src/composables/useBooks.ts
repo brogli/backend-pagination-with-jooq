@@ -138,7 +138,7 @@ export function useBooks() {
       // response never clobbers a newer cursor.
       const staleCursor = sentCursor !== null && cursor.value === sentCursor
       if (response.error) {
-        if (staleCursor && response.response.status === 400) {
+        if (staleCursor && response.response?.status === 400) {
           console.error('searchBooks returned error, dropping cursor', response.error)
           dropCursor()
           return
