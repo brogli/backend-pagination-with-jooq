@@ -2,6 +2,12 @@
 
 [![CI](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml/badge.svg)](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml)
 
+## AI coding agent used - viewer discretion is advised
+
+I've used an AI coding agent to help with research and with writing code and prose. While I've
+reviewed and iterated on most of the code to adhere to my expectations, I can't guarantee there's
+some slop left.
+
 ## About
 
 This was an experiment on how to do keyset pagination with JOOQ.
