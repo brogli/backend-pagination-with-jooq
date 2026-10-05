@@ -61,15 +61,45 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun     # seed 1M rows on fi
 ./gradlew :frontend:pnpmDev    # Vite dev server on http://localhost:5173
 ```
 
-### End-to-end test
+## Running tests
+
+Backend and end-to-end tests start Postgres through Testcontainers, which needs a docker-compatible
+socket. For podman: `export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`.
+
+### Backend
 
 ```bash
-cd frontend && pnpm install && pnpm test:e2e
+./gradlew :backend:test     # unit + integration tests
+./gradlew :backend:check    # tests + spotless
 ```
 
-Playwright starts the backend with the built SPA and a throwaway Postgres container, then drives
-Chromium from the dev shell against it. If it fails with "Executable doesn't exist",
-`@playwright/test` and `flake.lock` have drifted apart: bump them together.
+### Frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm test:unit              # Vitest, watch mode (append --run for a single pass)
+```
+
+### End-to-end
+
+```bash
+cd frontend
+pnpm install
+pnpm test:e2e               # Playwright smoke test
+```
+
+Playwright starts the backend with the built SPA and a throwaway Postgres container on
+`localhost:8080`, then drives Chromium from the dev shell against it. A server already running on
+that port is reused, so stop an unseeded `bootRun` first. If the test fails with "Executable doesn't
+exist", `@playwright/test` and `flake.lock` have drifted apart: bump them together.
+
+### Lint and format
+
+```bash
+treefmt                     # frontend sources, Markdown, Nix
+./gradlew :backend:spotlessApply
+```
 
 ## Backend container
 
