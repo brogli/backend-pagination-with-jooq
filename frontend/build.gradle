@@ -1,6 +1,5 @@
 // :frontend wraps pnpm via gradle-node-plugin so the multi-module Gradle build
-// can drive the SPA hermetically — Node + pnpm are downloaded into
-// `.gradle/nodejs/` so a fresh checkout with just JDK + Gradle can build.
+// can drive the SPA.
 //
 // `assemble` produces dist/ for :backend to embed into the jar; `pnpmDev`
 // is a long-running task you invoke manually for local development.
@@ -10,11 +9,8 @@ plugins {
 }
 
 node {
-    // Pinned versions are the source of truth for CI; mirrors `engines` and
-    // `packageManager` in package.json. Update both together.
-    download = true
-    version = '24.15.0'
-    pnpmVersion = '10.33.2'
+    // Node and pnpm come from the Nix dev shell (flake.nix).
+    download = false
 }
 
 def openapiSpec = '../backend/src/main/resources/openapi/openapi.yaml'
@@ -38,6 +34,7 @@ def pnpmBuild = tasks.register('pnpmBuild', PnpmTask) {
     inputs.file 'index.html'
     inputs.file 'package.json'
     inputs.file 'pnpm-lock.yaml'
+    inputs.file 'pnpm-workspace.yaml'
     inputs.file 'vite.config.ts'
     inputs.file 'tsconfig.json'
     inputs.file 'tsconfig.app.json'

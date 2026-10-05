@@ -120,3 +120,6 @@ http-client.private.env.json
 
 ### Load test artifacts ###
 tools/load/out/
+
+### direnv ###
+.direnv/
