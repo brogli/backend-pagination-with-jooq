@@ -19,3 +19,7 @@ src/api/generated/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Playwright
+test-results/
+playwright-report/

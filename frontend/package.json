@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "pretest:unit": "pnpm gen:api",
     "test:unit": "vitest",
+    "test:e2e": "playwright test",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "gen:api": "openapi-ts",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@tsconfig/node24": "24.0.5",
     "@types/jsdom": "30.0.0",
@@ -41,6 +43,7 @@
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-oxlint": "1.86.0",
+    "eslint-plugin-playwright": "2.12.0",
     "eslint-plugin-vue": "10.11.1",
     "jiti": "2.7.0",
     "jsdom": "30.1.1",

@@ -61,6 +61,16 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun     # seed 1M rows on fi
 ./gradlew :frontend:pnpmDev    # Vite dev server on http://localhost:5173
 ```
 
+### End-to-end test
+
+```bash
+cd frontend && pnpm install && pnpm test:e2e
+```
+
+Playwright starts the backend with the built SPA and a throwaway Postgres container, then drives
+Chromium from the dev shell against it. If it fails with "Executable doesn't exist",
+`@playwright/test` and `flake.lock` have drifted apart: bump them together.
+
 ## Backend container
 
 Build the image (Jib needs a docker-compatible socket — for podman:
