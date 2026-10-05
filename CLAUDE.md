@@ -96,8 +96,8 @@
 
 - **Formatting**: oxc toolchain (oxlint + oxfmt) — no Prettier. oxfmt enforces no semicolons, single
   quotes; `.editorconfig` enforces 2-space indent, 100-char line. `pnpm lint` runs the linters with
-  `--fix`. `treefmt` (repo root) runs lint fixes + formatting over frontend sources, Markdown and
-  Nix files; `treefmt --ci` is the CI check.
+  `--fix`. `treefmt` (repo root) runs lint fixes + formatting over frontend sources, then spotless
+  for the backend, plus Markdown and Nix files; `treefmt --ci` is the CI check.
 - **`if`/`else` always braced**. No single-line braceless form: `if (x) doSomething()` →
   `if (x) { doSomething() }`. Applies to early-return guards too.
 - **TypeScript strict**: no `any`, no implicit `any`. No non-null assertions (`!`) or `as` casts
@@ -169,7 +169,7 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun      # dev + 1M-row seed
 ./gradlew :frontend:assemble                                 # type-check + vite build → dist/
 (cd frontend && pnpm test:e2e)                               # Playwright smoke test, boots the stack
 
-treefmt                                                      # lint fixes + format (frontend, md, nix)
+treefmt                                                      # lint fixes + format (frontend, backend, md, nix)
 ```
 
 DataSource: `jdbc:postgresql://localhost:5432/books`, `postgres`/`postgres`. Override via

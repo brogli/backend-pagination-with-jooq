@@ -97,8 +97,7 @@ exist", `@playwright/test` and `flake.lock` have drifted apart: bump them togeth
 ### Lint and format
 
 ```bash
-treefmt                     # frontend sources, Markdown, Nix
-./gradlew :backend:spotlessApply
+treefmt                     # frontend lint + format, backend format (spotless), Markdown, Nix
 ```
 
 ## Backend container
