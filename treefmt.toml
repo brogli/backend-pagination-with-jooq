@@ -28,3 +28,16 @@ includes = ["*.md"]
 [formatter.nixfmt]
 command = "nixfmt"
 includes = ["*.nix"]
+
+# Spotless owns backend formatting (config in backend/build.gradle). It formats the whole module, so
+# the paths treefmt appends are ignored.
+[formatter.spotless]
+command = "bash"
+options = ["-c", "./gradlew --quiet :backend:spotlessApply", "--"]
+includes = [
+  "backend/*.java",
+  "backend/*.gradle",
+  "backend/src/main/resources/*.yml",
+  "backend/src/main/resources/*.yaml",
+  "backend/src/main/resources/*.xml",
+]
