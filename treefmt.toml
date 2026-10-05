@@ -1,0 +1,30 @@
+# Frontend tools run via `pnpm exec` inside frontend/, so their versions come from pnpm-lock.yaml.
+# treefmt passes paths relative to the repo root, hence the `frontend/` prefix strip.
+# Lower priority runs first: lint fixes before formatting.
+
+[formatter.oxlint]
+command = "bash"
+options = ["-c", "cd frontend && pnpm exec oxlint --fix \"${@#frontend/}\"", "--"]
+includes = ["frontend/*.vue", "frontend/*.ts", "frontend/*.mts", "frontend/*.tsx"]
+priority = 1
+
+[formatter.eslint]
+command = "bash"
+options = ["-c", "cd frontend && pnpm exec eslint --fix --cache --no-warn-ignored \"${@#frontend/}\"", "--"]
+includes = ["frontend/*.vue", "frontend/*.ts", "frontend/*.mts", "frontend/*.tsx"]
+priority = 2
+
+[formatter.oxfmt]
+command = "bash"
+options = ["-c", "cd frontend && pnpm exec oxfmt \"${@#frontend/}\"", "--"]
+includes = ["frontend/*.vue", "frontend/*.ts", "frontend/*.mts", "frontend/*.tsx", "frontend/*.css"]
+priority = 3
+
+# Runs from the repo root so the root .oxfmtrc.json (prose wrapping) applies.
+[formatter.oxfmt-md]
+command = "frontend/node_modules/.bin/oxfmt"
+includes = ["*.md"]
+
+[formatter.nixfmt]
+command = "nixfmt"
+includes = ["*.nix"]

@@ -9,13 +9,13 @@ Spring JPA can do
 With JOOQ you have to hand-roll it. Since offset based pagination doesn't scale well, I went for a
 keyset pagination POC.
 
-A Vue 3 + PrimeVue 4 SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
+A Vue 3 + OpenVue SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
 jOOQ's `seek()` for keyset pagination. Page cost stays constant regardless of depth, unlike
 `LIMIT/OFFSET`. The seek key travels as an opaque base64-encoded cursor in a query param, so
-refresh, bookmarks, and browser back/forward all round-trip. A cursor is bound to the sort, direction
-and filter set it was issued under, and a stale cursor falls back to page one. Each page response
-carries both `nextCursor` and `prevCursor`, enabling bidirectional walking without a client-side
-stack. Detailed design lives in [`docs/`](./docs/).
+refresh, bookmarks, and browser back/forward all round-trip. A cursor is bound to the sort,
+direction and filter set it was issued under, and a stale cursor falls back to page one. Each page
+response carries both `nextCursor` and `prevCursor`, enabling bidirectional walking without a
+client-side stack. Detailed design lives in [`docs/`](./docs/).
 
 ## Findings
 
@@ -33,8 +33,9 @@ with [`tools/load/run.sh`](./tools/load/).
 
 ## Running locally
 
-Prereqs: Java 25 (`sdk install java 25.0.3-tem`), podman, Node.js + pnpm (versions pinned in
-`frontend/package.json`; `corepack enable` handles pnpm).
+Prereqs: podman and the [Nix package manager](https://nixos.org/download/) with flakes enabled. The
+dev shell provides Java 25, Node.js and pnpm: `direnv allow` loads it automatically, or run
+`nix develop`.
 
 ### Database
 
