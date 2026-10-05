@@ -1,11 +1,6 @@
 import { mount, type ComponentMountingOptions } from '@vue/test-utils'
-import PrimeVue from 'primevue/config'
-import {
-  createMemoryHistory,
-  createRouter,
-  type RouteRecordRaw,
-  type Router,
-} from 'vue-router'
+import OpenVue from 'openvue/config'
+import { createMemoryHistory, createRouter, type RouteRecordRaw, type Router } from 'vue-router'
 import { AppPreset } from '@/theme/preset'
 
 const stubRoute: RouteRecordRaw = {
@@ -36,7 +31,7 @@ export async function mountWithApp<T>(
       plugins: [
         ...(options.global?.plugins ?? []),
         router,
-        [PrimeVue, { theme: { preset: AppPreset } }],
+        [OpenVue, { theme: { preset: AppPreset } }],
       ],
     },
   }) as MountResult<T>
