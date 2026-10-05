@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import DataTable, { type DataTableSortEvent } from 'primevue/datatable'
-import Column from 'primevue/column'
-import Select from 'primevue/select'
-import Button from 'primevue/button'
+import DataTable, { type DataTableSortEvent } from 'openvue/datatable'
+import Column from 'openvue/column'
+import Select from 'openvue/select'
+import Button from 'openvue/button'
 import type { BookDto } from '@/api/generated/types.gen'
 import { PAGE_SIZES, SORT_FIELDS, useBookSorting } from '@/composables/useBooks'
 import { GENRE_LABEL } from '@/lib/genre'

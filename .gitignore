@@ -120,3 +120,15 @@ http-client.private.env.json
 
 ### Load test artifacts ###
 tools/load/out/
+
+### Eclipse JDT language server (Zed, VS Code) ###
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+.classpath
+.project
+.settings/
+.factorypath
+
+### direnv ###
+.direnv/

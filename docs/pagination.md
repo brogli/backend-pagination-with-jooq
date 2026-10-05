@@ -113,8 +113,8 @@ from the incoming request and rejects the cursor with 400 if it differs. The fil
 themselves stay out of the cursor, which keeps it short and avoids duplicating state that already
 lives in the query string.
 
-The frontend drops the cursor whenever a filter, sort or page size changes, so the 400 only fires for
-hand-edited or stale URLs.
+The frontend drops the cursor whenever a filter, sort or page size changes, so the 400 only fires
+for hand-edited or stale URLs.
 
 ## Stale cursors
 
