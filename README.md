@@ -4,6 +4,8 @@
 
 ## About
 
+This was an experiment on how to do keyset pagination with JOOQ.
+
 Spring JPA can do
 [offset and keyset based pagination](https://docs.spring.io/spring-data/jpa/reference/repositories/query-methods-details.html#repositories.scrolling.guidance).
 With JOOQ you have to hand-roll it. Since offset based pagination doesn't scale well, I went for a
