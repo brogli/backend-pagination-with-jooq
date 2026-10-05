@@ -9,7 +9,11 @@
 ## Pinned versions
 
 - Spring Boot **4.1.0** (Groovy DSL, `build.gradle`)
-- Gradle wrapper **9.6.1**, Java **25** (Temurin via sdkman; `sdk use java 25.0.3-tem` first)
+- Gradle wrapper **9.6.1**, Java **25** (Temurin)
+- JDK, Node 24 and pnpm 11 come from the Nix dev shell (`flake.nix`, loaded via direnv locally and
+  `nix develop` in CI). `flake.lock` is the single source of truth: don't add sdkman, `.nvmrc`,
+  `engines` or `packageManager`. When bumping the Node major, update `nodejs_*` and
+  `@tsconfig/node*` together.
 - Liquibase **5.0.3**, jOOQ **3.21.6**, Postgres JDBC **42.7.13**, Testcontainers **1.21.4**
 - `org.openapi.generator` plugin **7.22.0+**
 - jOOQ codegen and runtime versions **must match** — newer codegen emits symbols missing in older
@@ -29,8 +33,8 @@
   (`'!seed-large and !seed-medium'`); comma is OR in Liquibase 5 and `'!a,!b'` accepts changesets
   tagged `a` because they satisfy `!b`.
 - Cursor fingerprint canonical string must use the OpenAPI enum `getValue()` strings, never enum
-  `hashCode()` (identity-based, differs per JVM). Changing the fingerprint input or the cursor
-  wire shape requires bumping `Cursor.CURRENT_VERSION`.
+  `hashCode()` (identity-based, differs per JVM). Changing the fingerprint input or the cursor wire
+  shape requires bumping `Cursor.CURRENT_VERSION`.
 
 ## Boot 4 surprises
 
@@ -73,14 +77,17 @@
 
 ## Frontend (`:frontend`)
 
-- Vue 3 + PrimeVue 4 (styled mode) + Tailwind v4 + vue-router, ported from
-  `opinionated-vuejs-starter`. **No Pinia, no Playwright** (vitest stays).
-- `gradle-node-plugin` (`com.github.node-gradle.node`) downloads Node + pnpm into `.gradle/nodejs/`;
-  builds are hermetic, no nvm needed for `:frontend:assemble`. Node + pnpm versions are pinned in
-  **two** places — `frontend/build.gradle` (`node { version, pnpmVersion }`) and
-  `frontend/package.json` (`engines`, `packageManager`). Bump both together; renovate will not link
-  them.
-- Outside Gradle, work in `frontend/` with system pnpm (use nvm or corepack).
+- Vue 3 + OpenVue (MIT fork of PrimeVue 4.5.5, same API, styled mode) + Tailwind v4 + vue-router,
+  ported from `opinionated-vuejs-starter`. **No Pinia.**
+- Don't add `primevue`, `@primeuix/*` or `primeicons` (no longer MIT). Theme base is
+  `@openuxkit/themes`. `tailwindcss-primeui` stays (MIT, OpenVue keeps the `p` token prefix).
+- `gradle-node-plugin` runs with `download = false`: Gradle uses the dev shell's Node and pnpm, so
+  run `./gradlew` inside the shell.
+- E2E: one Playwright smoke test (`frontend/e2e/`) against the real stack. Playwright starts
+  `:backend:bootTestRun` (built SPA embedded, Postgres testcontainer, `seed-medium`) on :8080 and
+  reuses a server already running there locally. Chromium comes from the dev shell
+  (`playwright-driver.browsers`), so don't run `playwright install`. Its version must equal
+  `@playwright/test`: bump both in one change.
 - Hey API codegen: `openapi-ts.config.ts` reads
   `../backend/src/main/resources/openapi/openapi.yaml`. Output `frontend/src/api/generated/` is
   gitignored. Runs as `predev` / `prebuild`.
@@ -88,8 +95,9 @@
 ### Frontend conventions
 
 - **Formatting**: oxc toolchain (oxlint + oxfmt) — no Prettier. oxfmt enforces no semicolons, single
-  quotes; `.editorconfig` enforces 2-space indent, 100-char line. `pnpm lint` runs both with
-  `--fix`.
+  quotes; `.editorconfig` enforces 2-space indent, 100-char line. `pnpm lint` runs the linters with
+  `--fix`. `treefmt` (repo root) runs lint fixes + formatting over frontend sources, then spotless
+  for the backend, plus Markdown and Nix files; `treefmt --ci` is the CI check.
 - **`if`/`else` always braced**. No single-line braceless form: `if (x) doSomething()` →
   `if (x) { doSomething() }`. Applies to early-return guards too.
 - **TypeScript strict**: no `any`, no implicit `any`. No non-null assertions (`!`) or `as` casts
@@ -99,11 +107,11 @@
 - **Vue SFCs**: type-based forms only — `defineProps<Props>()`,
   `defineEmits<{ change: [value: string] }>()`, `withDefaults(defineProps<Props>(), { ... })`. No
   runtime object form.
-- **PrimeVue**: components imported per-file (no global registration). All design-token overrides go
+- **OpenVue**: components imported per-file (no global registration). All design-token overrides go
   in `src/theme/preset.ts` — don't inline theme tweaks in `main.ts` or component styles.
 - **Tailwind v4**: CSS-first config (no `tailwind.config.js`). Prefer utilities over scoped
   `<style>`; reserve `<style>` for what Tailwind can't express (keyframes, complex selectors). CSS
-  layer order `theme, base, primevue, components, utilities` lives in `src/assets/main.css` and is
+  layer order `theme, base, openvue, components, utilities` lives in `src/assets/main.css` and is
   mirrored in `main.ts` via `cssLayer` — keep them in sync.
 - **Path alias**: `@` → `src/` (`vite.config.ts` and tsconfigs).
 - **Views vs components**: `src/views/` = route targets, `src/components/` = reusable pieces.
@@ -159,6 +167,9 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun      # dev + 1M-row seed
 ./gradlew :frontend:pnpmDev                                  # vite dev server on :5173
 ./gradlew :frontend:pnpmGenApi                               # regenerate Hey API client
 ./gradlew :frontend:assemble                                 # type-check + vite build → dist/
+(cd frontend && pnpm test:e2e)                               # Playwright smoke test, boots the stack
+
+treefmt                                                      # lint fixes + format (frontend, backend, md, nix)
 ```
 
 DataSource: `jdbc:postgresql://localhost:5432/books`, `postgres`/`postgres`. Override via

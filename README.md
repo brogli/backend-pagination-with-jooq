@@ -2,20 +2,28 @@
 
 [![CI](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml/badge.svg)](https://github.com/brogli/backend-pagination-with-jooq/actions/workflows/ci.yml)
 
+## AI coding agent used - viewer discretion is advised
+
+I've used an AI coding agent to help with research and with writing code and prose. While I've
+reviewed and iterated on most of the code to adhere to my expectations, I can't guarantee there's
+some slop left.
+
 ## About
+
+This was an experiment on how to do keyset pagination with JOOQ.
 
 Spring JPA can do
 [offset and keyset based pagination](https://docs.spring.io/spring-data/jpa/reference/repositories/query-methods-details.html#repositories.scrolling.guidance).
 With JOOQ you have to hand-roll it. Since offset based pagination doesn't scale well, I went for a
 keyset pagination POC.
 
-A Vue 3 + PrimeVue 4 SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
+A Vue 3 + OpenVue SPA browses a 1M-row Postgres table through a Spring Boot 4 backend that uses
 jOOQ's `seek()` for keyset pagination. Page cost stays constant regardless of depth, unlike
 `LIMIT/OFFSET`. The seek key travels as an opaque base64-encoded cursor in a query param, so
-refresh, bookmarks, and browser back/forward all round-trip. A cursor is bound to the sort, direction
-and filter set it was issued under, and a stale cursor falls back to page one. Each page response
-carries both `nextCursor` and `prevCursor`, enabling bidirectional walking without a client-side
-stack. Detailed design lives in [`docs/`](./docs/).
+refresh, bookmarks, and browser back/forward all round-trip. A cursor is bound to the sort,
+direction and filter set it was issued under, and a stale cursor falls back to page one. Each page
+response carries both `nextCursor` and `prevCursor`, enabling bidirectional walking without a
+client-side stack. Detailed design lives in [`docs/`](./docs/).
 
 ## Findings
 
@@ -33,8 +41,9 @@ with [`tools/load/run.sh`](./tools/load/).
 
 ## Running locally
 
-Prereqs: Java 25 (`sdk install java 25.0.3-tem`), podman, Node.js + pnpm (versions pinned in
-`frontend/package.json`; `corepack enable` handles pnpm).
+Prereqs: podman and the [Nix package manager](https://nixos.org/download/) with flakes enabled. The
+dev shell provides Java 25, Node.js and pnpm: `direnv allow` loads it automatically, or run
+`nix develop`.
 
 ### Database
 
@@ -58,6 +67,45 @@ SPRING_PROFILES_ACTIVE=local ./gradlew :backend:bootRun     # seed 1M rows on fi
 
 ```bash
 ./gradlew :frontend:pnpmDev    # Vite dev server on http://localhost:5173
+```
+
+## Running tests
+
+Backend and end-to-end tests start Postgres through Testcontainers, which needs a docker-compatible
+socket. For podman: `export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock`.
+
+### Backend
+
+```bash
+./gradlew :backend:test     # unit + integration tests
+./gradlew :backend:check    # tests + spotless
+```
+
+### Frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm test:unit              # Vitest, watch mode (append --run for a single pass)
+```
+
+### End-to-end
+
+```bash
+cd frontend
+pnpm install
+pnpm test:e2e               # Playwright smoke test
+```
+
+Playwright starts the backend with the built SPA and a throwaway Postgres container on
+`localhost:8080`, then drives Chromium from the dev shell against it. A server already running on
+that port is reused, so stop an unseeded `bootRun` first. If the test fails with "Executable doesn't
+exist", `@playwright/test` and `flake.lock` have drifted apart: bump them together.
+
+### Lint and format
+
+```bash
+treefmt                     # frontend lint + format, backend format (spotless), Markdown, Nix
 ```
 
 ## Backend container
