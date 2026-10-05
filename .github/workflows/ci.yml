@@ -61,6 +61,8 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
+        # Job-level defaults replace the workflow-level ones, so the shell is repeated here.
+        shell: nix develop --command bash -eo pipefail {0}
         working-directory: frontend
     steps:
       - name: Checkout
@@ -102,6 +104,8 @@ jobs:
     timeout-minutes: 25
     defaults:
       run:
+        # Job-level defaults replace the workflow-level ones, so the shell is repeated here.
+        shell: nix develop --command bash -eo pipefail {0}
         working-directory: frontend
     steps:
       - name: Checkout
