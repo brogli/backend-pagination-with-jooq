@@ -31,7 +31,7 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "@playwright/test": "1.63.0",
-    "@tailwindcss/vite": "4.3.3",
+    "@tailwindcss/vite": "4.3.4",
     "@tsconfig/node24": "24.0.5",
     "@types/jsdom": "30.0.0",
     "@types/node": "24.19.2",
@@ -50,7 +50,7 @@
     "npm-run-all2": "9.0.4",
     "oxfmt": "0.72.0",
     "oxlint": "1.90.0",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "4.3.4",
     "tailwindcss-primeui": "0.6.1",
     "typescript": "6.0.3",
     "vite": "8.3.5",
