@@ -24,7 +24,7 @@
     "@openuxkit/themes": "1.2.0",
     "@vueuse/router": "15.0.0",
     "dayjs": "1.11.23",
-    "openvue": "1.1.0",
+    "openvue": "1.1.1",
     "vue": "3.5.44",
     "vue-router": "5.4.0"
   },
